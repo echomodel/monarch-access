@@ -12,6 +12,12 @@ requires-python = ">=3.10"
 dependencies = [
     "aiohttp>=3.8.0",
     "click>=8.0.0",
+    "tinydb>=4.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
 ]
 
 [project.scripts]
@@ -23,3 +29,6 @@ Repository = "https://github.com/krisrowe/monarch-access"
 
 [tool.setuptools.packages.find]
 include = ["monarch*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

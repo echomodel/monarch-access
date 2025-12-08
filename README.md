@@ -2,10 +2,37 @@
 
 Lightweight CLI and Python SDK for accessing [Monarch Money](https://www.monarchmoney.com/) financial data.
 
-```bash
-monarch accounts
-monarch net-worth
-monarch transactions list --start 2025-01-01
+```
+$ monarch accounts
+ACCOUNTS (5)
++--------------------------------+--------------------+----------------+
+| Account                        | Institution        |        Balance |
++--------------------------------+--------------------+----------------+
+| [Checking]                     |                    |      $8,434.56 |
+|   Primary Checking             | First National     |      $5,234.56 |
+|   Joint Checking               | First National     |      $3,200.00 |
+| [Credit Card]                  |                    |     -$3,148.06 |
+|   Rewards Card                 | Premium Credit     |     -$2,345.67 |
+|   Store Card                   | Target             |       -$802.39 |
+| [Savings]                      |                    |     $12,500.00 |
+|   Emergency Fund               | First National     |     $12,500.00 |
++--------------------------------+--------------------+----------------+
+```
+
+```
+$ monarch transactions list --start 2025-01-01 --limit 5
+TRANSACTIONS (5)
++------------+--------------------------+----------------------+--------------+
+| Date       | Merchant                 | Category             |       Amount |
++------------+--------------------------+----------------------+--------------+
+| 2025-01-15 | Amazon                   | Shopping             |     -$127.43 |
+| 2025-01-14 | Whole Foods              | Groceries            |      -$89.23 |
+| 2025-01-13 | Shell                    | Gas                  |      -$45.00 |
+| 2025-01-12 | Netflix                  | Entertainment        |      -$15.99 |
+| 2025-01-10 | Employer Payroll         | Salary               |    $3,500.00 |
++------------+--------------------------+----------------------+--------------+
+
+Total: $3,222.35
 ```
 
 ## Installation

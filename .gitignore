@@ -21,3 +21,6 @@ refs/
 
 # Logs
 *.log
+
+# Generated test data (derived from test_data_seed.json)
+tests/fixtures/test_data.json

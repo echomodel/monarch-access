@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Monarch Money CLI."""
 
-import asyncio
 import fnmatch
 import json
 import sys
@@ -9,14 +8,9 @@ from typing import Optional
 
 import click
 
-from . import accounts, categories, net_worth, transactions
-from .transactions import get as txn_get, list as txn_list, update as txn_update
-from .client import MonarchClient, AuthenticationError, APIError
-
-
-def run_async(coro):
-    """Run async function in sync context."""
-    return asyncio.run(coro)
+from . import accounts, net_worth, transactions
+from .client import AuthenticationError, APIError
+from .providers import get_provider
 
 
 @click.group()
@@ -55,10 +49,10 @@ def list_transactions(
 ):
     """List transactions with optional filters."""
     try:
-        result = run_async(_list_transactions(
+        result = _list_transactions(
             output_format, account, category, start_date, end_date,
             merchant, notes, original_statement, limit
-        ))
+        )
         click.echo(result)
     except AuthenticationError as e:
         click.echo(f"Authentication error: {e}", err=True)
@@ -68,7 +62,7 @@ def list_transactions(
         sys.exit(1)
 
 
-async def _list_transactions(
+def _list_transactions(
     output_format: str,
     account: tuple,
     category: tuple,
@@ -79,8 +73,8 @@ async def _list_transactions(
     original_statement: Optional[str],
     limit: int,
 ) -> str:
-    """Async implementation of list transactions."""
-    client = MonarchClient()
+    """Implementation of list transactions."""
+    provider = get_provider()
 
     # Parse comma-separated values from options
     account_names = _parse_multi_option(account)
@@ -89,7 +83,7 @@ async def _list_transactions(
     # Get account IDs if filtering by account name
     account_ids = None
     if account_names:
-        accts = await accounts.get_accounts(client)
+        accts = provider.get_accounts()
         account_ids = [
             a["id"] for a in accts
             if any(fnmatch.fnmatch(a["displayName"].lower(), name.lower()) for name in account_names)
@@ -100,7 +94,7 @@ async def _list_transactions(
     # Get category IDs if filtering by category name
     category_ids = None
     if category_names:
-        cats = await categories.get_categories(client)
+        cats = provider.get_categories()
         category_ids = [
             c["id"] for c in cats
             if any(fnmatch.fnmatch(c["name"].lower(), name.lower()) for name in category_names)
@@ -109,8 +103,7 @@ async def _list_transactions(
             return json.dumps({"error": f"No categories matching: {category_names}"})
 
     # Fetch transactions
-    data = await txn_list.get_transactions(
-        client,
+    data = provider.get_transactions(
         limit=limit,
         start_date=start_date,
         end_date=end_date,
@@ -123,7 +116,7 @@ async def _list_transactions(
 
     # Apply client-side filters (merchant, notes, original_statement)
     if merchant:
-        txns = [t for t in txns if _wildcard_match(t.get("merchant", {}).get("name", ""), merchant)]
+        txns = [t for t in txns if _wildcard_match((t.get("merchant") or {}).get("name", ""), merchant)]
     if notes:
         txns = [t for t in txns if _wildcard_match(t.get("notes") or "", notes)]
     if original_statement:
@@ -170,7 +163,7 @@ def _wildcard_match(text: str, pattern: str) -> bool:
 def get_transaction(transaction_id: str, output_format: str):
     """Get a single transaction by ID."""
     try:
-        result = run_async(_get_transaction(transaction_id, output_format))
+        result = _get_transaction(transaction_id, output_format)
         click.echo(result)
     except AuthenticationError as e:
         click.echo(f"Authentication error: {e}", err=True)
@@ -180,10 +173,10 @@ def get_transaction(transaction_id: str, output_format: str):
         sys.exit(1)
 
 
-async def _get_transaction(transaction_id: str, output_format: str) -> str:
-    """Async implementation of get transaction."""
-    client = MonarchClient()
-    txn = await txn_get.get_transaction(client, transaction_id)
+def _get_transaction(transaction_id: str, output_format: str) -> str:
+    """Implementation of get transaction."""
+    provider = get_provider()
+    txn = provider.get_transaction(transaction_id)
 
     if not txn:
         return json.dumps({"error": f"Transaction not found: {transaction_id}"})
@@ -209,9 +202,9 @@ def update_transaction(
 ):
     """Update a transaction by ID. Only specified fields are changed."""
     try:
-        result = run_async(_update_transaction(
+        result = _update_transaction(
             transaction_id, category, merchant, notes, output_format
-        ))
+        )
         click.echo(result)
     except AuthenticationError as e:
         click.echo(f"Authentication error: {e}", err=True)
@@ -221,20 +214,20 @@ def update_transaction(
         sys.exit(1)
 
 
-async def _update_transaction(
+def _update_transaction(
     transaction_id: str,
     category: Optional[str],
     merchant: Optional[str],
     notes: Optional[str],
     output_format: str,
 ) -> str:
-    """Async implementation of update transaction."""
-    client = MonarchClient()
+    """Implementation of update transaction."""
+    provider = get_provider()
 
     # Resolve category name to ID if provided
     category_id = None
     if category is not None:
-        cats = await categories.get_categories(client)
+        cats = provider.get_categories()
         matching = [c for c in cats if c["name"].lower() == category.lower()]
         if not matching:
             # Try partial match
@@ -244,8 +237,7 @@ async def _update_transaction(
         category_id = matching[0]["id"]
 
     # Perform update
-    updated = await txn_update.update_transaction(
-        client,
+    updated = provider.update_transaction(
         transaction_id=transaction_id,
         category_id=category_id,
         merchant_name=merchant,
@@ -264,7 +256,7 @@ async def _update_transaction(
 def list_accounts(output_format: str):
     """List all accounts."""
     try:
-        result = run_async(_list_accounts(output_format))
+        result = _list_accounts(output_format)
         click.echo(result)
     except AuthenticationError as e:
         click.echo(f"Authentication error: {e}", err=True)
@@ -274,10 +266,10 @@ def list_accounts(output_format: str):
         sys.exit(1)
 
 
-async def _list_accounts(output_format: str) -> str:
-    """Async implementation of list accounts."""
-    client = MonarchClient()
-    accts = await accounts.get_accounts(client)
+def _list_accounts(output_format: str) -> str:
+    """Implementation of list accounts."""
+    provider = get_provider()
+    accts = provider.get_accounts()
 
     if output_format == "json":
         return json.dumps(accts, indent=2, default=str)
@@ -287,10 +279,54 @@ async def _list_accounts(output_format: str) -> str:
         return accounts.format_text(accts)
 
 
+@cli.command("categories")
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def list_categories(output_format: str):
+    """List all transaction categories."""
+    try:
+        result = _list_categories(output_format)
+        click.echo(result)
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+
+
+def _list_categories(output_format: str) -> str:
+    """Implementation of list categories."""
+    provider = get_provider()
+    cats = provider.get_categories()
+
+    if output_format == "json":
+        return json.dumps(cats, indent=2, default=str)
+    else:
+        # Text format - group by category group
+        lines = []
+        lines.append(f"CATEGORIES ({len(cats)})")
+        lines.append("-" * 40)
+
+        by_group: dict[str, list] = {}
+        for cat in cats:
+            group_name = cat.get("group", {}).get("name", "Other")
+            by_group.setdefault(group_name, []).append(cat)
+
+        for group_name in sorted(by_group.keys()):
+            group_cats = by_group[group_name]
+            group_type = group_cats[0].get("group", {}).get("type", "")
+            lines.append(f"\n[{group_name}] ({group_type})")
+            for cat in sorted(group_cats, key=lambda c: c["name"]):
+                lines.append(f"  {cat['name']}")
+
+        return "\n".join(lines)
+
+
 @cli.command("auth")
 @click.argument("token")
 def auth(token: str):
     """Save authentication token."""
+    from .client import MonarchClient
     client = MonarchClient(token=token)
     client.save_token()
     click.echo(f"Token saved to {client._token_file}")
@@ -301,7 +337,7 @@ def auth(token: str):
 def net_worth_cmd(output_format: str):
     """Show net worth report with assets and liabilities."""
     try:
-        result = run_async(_net_worth(output_format))
+        result = _net_worth(output_format)
         click.echo(result)
     except AuthenticationError as e:
         click.echo(f"Authentication error: {e}", err=True)
@@ -311,9 +347,10 @@ def net_worth_cmd(output_format: str):
         sys.exit(1)
 
 
-async def _net_worth(output_format: str) -> str:
-    client = MonarchClient()
-    accts = await accounts.get_accounts(client)
+def _net_worth(output_format: str) -> str:
+    """Implementation of net worth."""
+    provider = get_provider()
+    accts = provider.get_accounts()
     report = net_worth.build_report(accts)
 
     if output_format == "json":
