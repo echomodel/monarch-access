@@ -192,18 +192,20 @@ def _get_transaction(transaction_id: str, output_format: str) -> str:
 @click.option("--category", help="Category name to set")
 @click.option("--merchant", help="Merchant name to set")
 @click.option("--notes", help="Notes to set (use empty string to clear)")
+@click.option("--needs-review", type=bool, default=None, help="Set needs review flag (true/false)")
 @click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
 def update_transaction(
     transaction_id: str,
     category: Optional[str],
     merchant: Optional[str],
     notes: Optional[str],
+    needs_review: Optional[bool],
     output_format: str,
 ):
     """Update a transaction by ID. Only specified fields are changed."""
     try:
         result = _update_transaction(
-            transaction_id, category, merchant, notes, output_format
+            transaction_id, category, merchant, notes, needs_review, output_format
         )
         click.echo(result)
     except AuthenticationError as e:
@@ -219,6 +221,7 @@ def _update_transaction(
     category: Optional[str],
     merchant: Optional[str],
     notes: Optional[str],
+    needs_review: Optional[bool],
     output_format: str,
 ) -> str:
     """Implementation of update transaction."""
@@ -242,6 +245,7 @@ def _update_transaction(
         category_id=category_id,
         merchant_name=merchant,
         notes=notes,
+        needs_review=needs_review,
     )
 
     # Format output
