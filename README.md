@@ -220,12 +220,72 @@ async def main():
 asyncio.run(main())
 ```
 
+## MCP Server (AI Assistant Integration)
+
+This project includes a **Model Context Protocol (MCP) server** that enables AI assistants to access your Monarch Money data directly.
+
+### What is MCP?
+
+[Model Context Protocol](https://modelcontextprotocol.io/) is an open standard that allows AI assistants like **Claude Desktop**, **Gemini CLI**, and other agentic tools to securely connect to external data sources. With the Monarch MCP Server, you can ask your AI assistant things like:
+
+- *"Show me my spending on groceries this month"*
+- *"Find all transactions that need review and categorize them"*
+- *"What are my current account balances?"*
+- *"Split this transaction between two categories"*
+
+The MCP server exposes the same functionality as the CLI through a standardized protocol, allowing AI assistants to query and update your financial data on your behalf.
+
+### Quick Start
+
+```bash
+# Build the Docker image
+docker build -t monarch-mcp-server:latest .
+
+# Run with your token
+docker run -d --name monarch-mcp-server -p 8000:8000 \
+  -e MONARCH_TOKEN="your_token" monarch-mcp-server:latest
+```
+
+Then configure your MCP client (Claude Desktop, Gemini CLI, etc.) to connect.
+
+**For complete setup instructions, client configurations, and troubleshooting:**
+→ **[MCP Server Documentation](./MCP-SERVER.md)**
+
+**For detailed tool/resource reference:**
+→ **[Tools Reference](./docs/TOOLS.md)**
+
+## Architecture
+
+This project follows a layered architecture:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Access Layer                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │     CLI      │  │  MCP Server  │  │  Third-party │  │
+│  │  (click)     │  │  (FastMCP)   │  │     Apps     │  │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
+└─────────┼─────────────────┼─────────────────┼──────────┘
+          │                 │                 │
+          ▼                 ▼                 ▼
+┌─────────────────────────────────────────────────────────┐
+│                   Provider Layer                        │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │              Provider Interface                   │  │
+│  │  get_accounts(), get_transactions(), etc.        │  │
+│  └──────────────────────────────────────────────────┘  │
+│  ┌──────────────────┐  ┌────────────────────────────┐  │
+│  │   APIProvider    │  │      LocalProvider         │  │
+│  │  (Monarch API)   │  │    (Local TinyDB)          │  │
+│  └──────────────────┘  └────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+```
+
+The CLI, MCP server, and third-party applications all use the same Provider interface, ensuring consistent behavior and making the SDK reusable.
+
 ## Future Enhancements
 
 - **User configuration** (`~/.config/monarch/config.yaml`): Store user preferences like default columns for transaction lists, default output format, etc.
-  - `monarch config set transactions.columns "date,merchant,amount,category"`
-  - `monarch config get transactions.columns`
-- **MCP server**: Expose Monarch data to AI assistants via Model Context Protocol
 
 ## License
 

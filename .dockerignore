@@ -1,0 +1,35 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Environment files (contain secrets)
+.env
+.env.local
+
+# IDE and editor
+.idea/
+.vscode/
+.claude/
+
+# Git
+.git/
+.gitignore
+
+# Reference repos
+refs/
+
+# Tests
+tests/
+.pytest_cache/
+
+# Documentation (not needed in container)
+*.md
+docs/
+
+# Development files
+.dockerignore

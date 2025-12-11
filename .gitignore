@@ -15,6 +15,7 @@ __pycache__/
 .idea/
 .vscode/
 .claude/
+.gemini/
 
 # Reference repos (not part of this project)
 refs/
