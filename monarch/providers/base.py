@@ -41,6 +41,19 @@ class TransactionsProvider(Protocol):
         """Update a transaction. Only provided fields are updated."""
         ...
 
+    def bulk_update_transactions(
+        self,
+        transaction_ids: list[str],
+        needs_review: Optional[bool] = None,
+        category_id: Optional[str] = None,
+        hide_from_reports: Optional[bool] = None,
+    ) -> dict:
+        """Bulk update multiple transactions.
+
+        Returns dict with 'success', 'affectedCount', and 'errors' keys.
+        """
+        ...
+
 
 @runtime_checkable
 class AccountsProvider(Protocol):

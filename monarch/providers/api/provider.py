@@ -6,7 +6,9 @@ from typing import Any, Optional
 from ...client import MonarchClient, APIError
 from ...queries import (
     ACCOUNTS_QUERY,
+    BULK_UPDATE_TRANSACTIONS_MUTATION,
     GET_TRANSACTION_QUERY,
+    SPLIT_TRANSACTION_MUTATION,
     TRANSACTION_CATEGORIES_QUERY,
     TRANSACTIONS_QUERY,
     UPDATE_TRANSACTION_MUTATION,
@@ -134,6 +136,51 @@ class APIProvider:
 
         return result.get("transaction", {})
 
+    def bulk_update_transactions(
+        self,
+        transaction_ids: list[str],
+        needs_review: Optional[bool] = None,
+        category_id: Optional[str] = None,
+        hide_from_reports: Optional[bool] = None,
+    ) -> dict:
+        """Bulk update multiple transactions."""
+        return self._run(self._bulk_update_transactions(
+            transaction_ids, needs_review, category_id, hide_from_reports
+        ))
+
+    async def _bulk_update_transactions(
+        self,
+        transaction_ids: list[str],
+        needs_review: Optional[bool],
+        category_id: Optional[str],
+        hide_from_reports: Optional[bool],
+    ) -> dict:
+        updates: dict[str, Any] = {}
+        if needs_review is not None:
+            updates["needsReview"] = needs_review
+        if category_id is not None:
+            updates["categoryId"] = category_id
+        if hide_from_reports is not None:
+            updates["hide"] = hide_from_reports
+
+        variables = {
+            "selectedTransactionIds": transaction_ids,
+            "excludedTransactionIds": [],
+            "allSelected": False,
+            "expectedAffectedTransactionCount": len(transaction_ids),
+            "updates": updates,
+        }
+
+        data = await self._client._request(BULK_UPDATE_TRANSACTIONS_MUTATION, variables)
+        result = data.get("bulkUpdateTransactions", {})
+
+        if result.get("errors"):
+            errors = result["errors"]
+            msg = errors[0].get("message") if errors else "Unknown error"
+            raise APIError(f"Bulk update failed: {msg}")
+
+        return result
+
     def get_accounts(self) -> list[dict]:
         """Get all accounts."""
         return self._run(self._get_accounts())
@@ -149,3 +196,45 @@ class APIProvider:
     async def _get_categories(self) -> list[dict]:
         data = await self._client._request(TRANSACTION_CATEGORIES_QUERY)
         return data.get("categories", [])
+
+    def split_transaction(
+        self,
+        transaction_id: str,
+        split_data: list[dict],
+    ) -> dict:
+        """Split a transaction into multiple parts.
+
+        Args:
+            transaction_id: The transaction to split
+            split_data: List of splits, each with:
+                - amount: float (negative for expenses)
+                - categoryId: str
+                - merchantName: str (optional)
+                - notes: str (optional)
+
+        The sum of split amounts must equal the original transaction amount.
+        Pass empty list to remove all splits.
+        """
+        return self._run(self._split_transaction(transaction_id, split_data))
+
+    async def _split_transaction(
+        self,
+        transaction_id: str,
+        split_data: list[dict],
+    ) -> dict:
+        variables = {
+            "input": {
+                "transactionId": transaction_id,
+                "splitData": split_data,
+            }
+        }
+
+        data = await self._client._request(SPLIT_TRANSACTION_MUTATION, variables)
+        result = data.get("updateTransactionSplit", {})
+
+        if result.get("errors"):
+            errors = result["errors"]
+            msg = errors.get("message") or str(errors.get("fieldErrors", []))
+            raise APIError(f"Split failed: {msg}")
+
+        return result.get("transaction", {})

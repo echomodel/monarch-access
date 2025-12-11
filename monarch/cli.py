@@ -187,6 +187,94 @@ def _get_transaction(transaction_id: str, output_format: str) -> str:
         return transactions.format_single_text(txn)
 
 
+@transactions_group.command("mark-reviewed")
+@click.argument("transaction_ids")
+@click.option("--undo", is_flag=True, help="Mark as needing review instead")
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def mark_reviewed(transaction_ids: str, undo: bool, output_format: str):
+    """Mark transactions as reviewed (or needing review with --undo). Accepts comma-separated IDs."""
+    try:
+        result = _mark_reviewed(transaction_ids, undo, output_format)
+        click.echo(result)
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+
+
+def _mark_reviewed(transaction_ids: str, undo: bool, output_format: str) -> str:
+    """Implementation of mark-reviewed."""
+    provider = get_provider()
+    ids = [id.strip() for id in transaction_ids.split(",") if id.strip()]
+
+    if not ids:
+        return json.dumps({"error": "No transaction IDs provided"})
+
+    needs_review = undo  # --undo means set needsReview=True
+    results = []
+    for tid in ids:
+        try:
+            provider.update_transaction(transaction_id=tid, needs_review=needs_review)
+            results.append({"id": tid, "success": True})
+        except APIError as e:
+            results.append({"id": tid, "success": False, "error": str(e)})
+
+    success_count = sum(1 for r in results if r["success"])
+    action = "needing review" if undo else "reviewed"
+
+    if output_format == "json":
+        return json.dumps({"results": results, "success_count": success_count, "total": len(ids)}, indent=2)
+    else:
+        return f"Marked {success_count}/{len(ids)} transactions as {action}"
+
+
+@transactions_group.command("split")
+@click.argument("transaction_id")
+@click.option("--splits", required=True, help='JSON array of splits: [{"amount": -10.00, "categoryId": "123", "notes": "..."}]')
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def split_transaction(transaction_id: str, splits: str, output_format: str):
+    """Split a transaction into multiple parts.
+
+    The sum of split amounts must equal the original transaction amount.
+    Each split needs: amount (negative for expenses), categoryId.
+    Optional: merchantName, notes.
+    """
+    try:
+        result = _split_transaction(transaction_id, splits, output_format)
+        click.echo(result)
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        click.echo(f"Invalid JSON for splits: {e}", err=True)
+        sys.exit(1)
+
+
+def _split_transaction(transaction_id: str, splits: str, output_format: str) -> str:
+    """Implementation of split transaction."""
+    provider = get_provider()
+    split_data = json.loads(splits)
+
+    result = provider.split_transaction(transaction_id, split_data)
+
+    if output_format == "json":
+        return json.dumps(result, indent=2, default=str)
+    else:
+        splits_info = result.get("splitTransactions", [])
+        lines = [f"Transaction {transaction_id} split into {len(splits_info)} parts:"]
+        for s in splits_info:
+            cat = s.get("category", {}).get("name", "Unknown")
+            amt = s.get("amount", 0)
+            notes = s.get("notes", "")
+            lines.append(f"  ${abs(amt):.2f} -> {cat}" + (f" ({notes})" if notes else ""))
+        return "\n".join(lines)
+
+
 @transactions_group.command("update")
 @click.argument("transaction_id")
 @click.option("--category", help="Category name to set")

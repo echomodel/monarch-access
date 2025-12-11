@@ -143,6 +143,14 @@ query GetTransaction($id: UUID!) {
     notes
     isRecurring
     isSplitTransaction
+    hasSplitTransactions
+    splitTransactions {
+      id
+      amount
+      merchant { id name }
+      category { id name }
+      notes
+    }
     account {
       id
       displayName
@@ -161,5 +169,64 @@ query GetTransaction($id: UUID!) {
       color
     }
   }
+}
+"""
+
+BULK_UPDATE_TRANSACTIONS_MUTATION = """
+mutation BulkUpdateTransactions(
+    $selectedTransactionIds: [ID!]!,
+    $excludedTransactionIds: [ID!],
+    $allSelected: Boolean!,
+    $expectedAffectedTransactionCount: Int!,
+    $updates: TransactionUpdateParams!,
+    $filters: TransactionFilterInput
+) {
+    bulkUpdateTransactions(
+        selectedTransactionIds: $selectedTransactionIds,
+        excludedTransactionIds: $excludedTransactionIds,
+        updates: $updates,
+        allSelected: $allSelected,
+        expectedAffectedTransactionCount: $expectedAffectedTransactionCount,
+        filters: $filters
+    ) {
+        success
+        affectedCount
+        errors {
+            message
+        }
+    }
+}
+"""
+
+SPLIT_TRANSACTION_MUTATION = """
+mutation SplitTransaction($input: UpdateTransactionSplitMutationInput!) {
+    updateTransactionSplit(input: $input) {
+        transaction {
+            id
+            amount
+            hasSplitTransactions
+            splitTransactions {
+                id
+                amount
+                merchant {
+                    id
+                    name
+                }
+                category {
+                    id
+                    name
+                }
+                notes
+            }
+        }
+        errors {
+            fieldErrors {
+                field
+                messages
+            }
+            message
+            code
+        }
+    }
 }
 """
