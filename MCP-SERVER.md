@@ -153,6 +153,18 @@ gemini mcp add monarch docker run -i --rm \
 
 For detailed configuration options, HTTP vs stdio transport, VS Code integration, and troubleshooting, see **[docs/GEMINI-CLI.md](./docs/GEMINI-CLI.md)**.
 
+### Claude Code (CLI)
+
+Quick setup (mounts your existing token config):
+
+```bash
+claude mcp add --scope user monarch -- docker run -i --rm \
+  -v ~/.config/monarch:/root/.config/monarch:ro \
+  monarch-mcp-server:latest python server-stdio.py
+```
+
+For detailed configuration options, scope levels, and troubleshooting, see **[docs/CLAUDE-CODE.md](./docs/CLAUDE-CODE.md)**.
+
 ### Other MCP Clients
 
 For HTTP transport, connect to `http://localhost:8000/mcp` with the Docker container running.
@@ -264,6 +276,7 @@ This ensures consistent behavior across CLI, MCP, and any third-party integratio
 ## Related Documentation
 
 - [Tools Reference](./docs/TOOLS.md) - Detailed documentation of all MCP tools and resources
-- [Gemini CLI Setup](./docs/GEMINI-CLI.md) - Detailed Gemini CLI and Code Assist configuration
+- [Claude Code Setup](./docs/CLAUDE-CODE.md) - Claude Code CLI configuration
+- [Gemini CLI Setup](./docs/GEMINI-CLI.md) - Gemini CLI and Code Assist configuration
 - [Main README](./README.md) - CLI usage and authentication setup
 - [MCP Specification](https://modelcontextprotocol.io/) - Official MCP documentation

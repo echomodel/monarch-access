@@ -7,6 +7,7 @@ from ...client import MonarchClient, APIError
 from ...queries import (
     ACCOUNTS_QUERY,
     BULK_UPDATE_TRANSACTIONS_MUTATION,
+    CREATE_TRANSACTION_MUTATION,
     GET_TRANSACTION_QUERY,
     SPLIT_TRANSACTION_MUTATION,
     TRANSACTION_CATEGORIES_QUERY,
@@ -236,5 +237,62 @@ class APIProvider:
             errors = result["errors"]
             msg = errors.get("message") or str(errors.get("fieldErrors", []))
             raise APIError(f"Split failed: {msg}")
+
+        return result.get("transaction", {})
+
+    def create_transaction(
+        self,
+        date: str,
+        account_id: str,
+        amount: float,
+        merchant_name: str,
+        category_id: str,
+        notes: str = "",
+        update_balance: bool = False,
+    ) -> dict:
+        """Create a new manual transaction.
+
+        Args:
+            date: Transaction date in YYYY-MM-DD format
+            account_id: The account ID for this transaction
+            amount: Transaction amount (negative for expenses)
+            merchant_name: Name of the merchant/payee
+            category_id: Category ID for this transaction
+            notes: Optional notes
+            update_balance: Whether to update account balance
+        """
+        return self._run(self._create_transaction(
+            date, account_id, amount, merchant_name, category_id, notes, update_balance
+        ))
+
+    async def _create_transaction(
+        self,
+        date: str,
+        account_id: str,
+        amount: float,
+        merchant_name: str,
+        category_id: str,
+        notes: str,
+        update_balance: bool,
+    ) -> dict:
+        variables = {
+            "input": {
+                "date": date,
+                "accountId": account_id,
+                "amount": round(amount, 2),
+                "merchantName": merchant_name,
+                "categoryId": category_id,
+                "notes": notes,
+                "shouldUpdateBalance": update_balance,
+            }
+        }
+
+        data = await self._client._request(CREATE_TRANSACTION_MUTATION, variables)
+        result = data.get("createTransaction", {})
+
+        if result.get("errors"):
+            errors = result["errors"]
+            msg = errors.get("message") or str(errors.get("fieldErrors", []))
+            raise APIError(f"Create transaction failed: {msg}")
 
         return result.get("transaction", {})

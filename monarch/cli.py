@@ -304,6 +304,91 @@ def update_transaction(
         sys.exit(1)
 
 
+@transactions_group.command("create")
+@click.option("--date", required=True, help="Transaction date (YYYY-MM-DD)")
+@click.option("--account", required=True, help="Account name or ID")
+@click.option("--amount", required=True, type=float, help="Amount (negative for expenses)")
+@click.option("--merchant", required=True, help="Merchant/payee name")
+@click.option("--category", required=True, help="Category name")
+@click.option("--notes", default="", help="Optional notes")
+@click.option("--update-balance", is_flag=True, help="Update account balance")
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def create_transaction(
+    date: str,
+    account: str,
+    amount: float,
+    merchant: str,
+    category: str,
+    notes: str,
+    update_balance: bool,
+    output_format: str,
+):
+    """Create a new manual transaction."""
+    try:
+        result = _create_transaction(
+            date, account, amount, merchant, category, notes, update_balance, output_format
+        )
+        click.echo(result)
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+
+
+def _create_transaction(
+    date: str,
+    account: str,
+    amount: float,
+    merchant: str,
+    category: str,
+    notes: str,
+    update_balance: bool,
+    output_format: str,
+) -> str:
+    """Implementation of create transaction."""
+    provider = get_provider()
+
+    # Resolve account name to ID if not already an ID
+    account_id = account
+    if not account.isdigit():
+        accts = provider.get_accounts()
+        matching = [a for a in accts if a["displayName"].lower() == account.lower()]
+        if not matching:
+            # Try partial match
+            matching = [a for a in accts if account.lower() in a["displayName"].lower()]
+        if not matching:
+            return json.dumps({"error": f"Account not found: {account}"})
+        account_id = matching[0]["id"]
+
+    # Resolve category name to ID
+    cats = provider.get_categories()
+    matching_cat = [c for c in cats if c["name"].lower() == category.lower()]
+    if not matching_cat:
+        # Try partial match
+        matching_cat = [c for c in cats if category.lower() in c["name"].lower()]
+    if not matching_cat:
+        return json.dumps({"error": f"Category not found: {category}"})
+    category_id = matching_cat[0]["id"]
+
+    # Create the transaction
+    created = provider.create_transaction(
+        date=date,
+        account_id=account_id,
+        amount=amount,
+        merchant_name=merchant,
+        category_id=category_id,
+        notes=notes,
+        update_balance=update_balance,
+    )
+
+    if output_format == "json":
+        return json.dumps(created, indent=2, default=str)
+    else:
+        return transactions.format_single_text(created)
+
+
 def _update_transaction(
     transaction_id: str,
     category: Optional[str],

@@ -230,3 +230,52 @@ mutation SplitTransaction($input: UpdateTransactionSplitMutationInput!) {
     }
 }
 """
+
+CREATE_TRANSACTION_MUTATION = """
+mutation Common_CreateTransactionMutation($input: CreateTransactionMutationInput!) {
+    createTransaction(input: $input) {
+        errors {
+            fieldErrors {
+                field
+                messages
+            }
+            message
+            code
+        }
+        transaction {
+            id
+            amount
+            date
+            notes
+            account {
+                id
+                displayName
+            }
+            category {
+                id
+                name
+            }
+            merchant {
+                id
+                name
+            }
+        }
+    }
+}
+"""
+
+DELETE_TRANSACTION_MUTATION = """
+mutation Common_DeleteTransactionMutation($input: DeleteTransactionMutationInput!) {
+    deleteTransaction(input: $input) {
+        deleted
+        errors {
+            fieldErrors {
+                field
+                messages
+            }
+            message
+            code
+        }
+    }
+}
+"""

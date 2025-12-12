@@ -120,6 +120,79 @@ class LocalProvider:
         """Get all transaction categories."""
         return self._categories.all()
 
+    def create_transaction(
+        self,
+        date: str,
+        account_id: str,
+        amount: float,
+        merchant_name: str,
+        category_id: str,
+        notes: str = "",
+        update_balance: bool = False,
+    ) -> dict:
+        """Create a new transaction.
+
+        Args:
+            date: Transaction date in YYYY-MM-DD format
+            account_id: The account ID for this transaction
+            amount: Transaction amount (negative for expenses)
+            merchant_name: Name of the merchant/payee
+            category_id: Category ID for this transaction
+            notes: Optional notes
+            update_balance: Whether to update account balance (ignored in local provider)
+        """
+        import uuid
+
+        # Look up account
+        Acct = Query()
+        acct = self._accounts.search(Acct.id == account_id)
+        if not acct:
+            raise ValueError(f"Account not found: {account_id}")
+        acct = acct[0]
+
+        # Look up category
+        Cat = Query()
+        cat = self._categories.search(Cat.id == category_id)
+        if not cat:
+            raise ValueError(f"Category not found: {category_id}")
+        cat = cat[0]
+
+        # Generate a unique ID
+        txn_id = str(uuid.uuid4().int)[:18]
+
+        # Create transaction document
+        txn = {
+            "id": txn_id,
+            "amount": round(amount, 2),
+            "date": date,
+            "notes": notes,
+            "pending": False,
+            "hideFromReports": False,
+            "needsReview": False,
+            "plaidName": "",
+            "isRecurring": False,
+            "reviewStatus": None,
+            "isSplitTransaction": False,
+            "account": {
+                "id": account_id,
+                "displayName": acct.get("displayName", ""),
+            },
+            "category": {
+                "id": category_id,
+                "name": cat.get("name", ""),
+            },
+            "merchant": {
+                "id": str(uuid.uuid4().int)[:18],
+                "name": merchant_name,
+            },
+            "tags": [],
+        }
+
+        # Insert into database
+        self._transactions.insert(txn)
+
+        return txn
+
     def close(self):
         """Close the database connection."""
         self._db.close()

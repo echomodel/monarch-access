@@ -18,6 +18,8 @@ from monarch.client import MonarchClient, AuthenticationError, APIError
 from monarch.queries import (
     ACCOUNTS_QUERY,
     BULK_UPDATE_TRANSACTIONS_MUTATION,
+    CREATE_TRANSACTION_MUTATION,
+    DELETE_TRANSACTION_MUTATION,
     GET_TRANSACTION_QUERY,
     SPLIT_TRANSACTION_MUTATION,
     TRANSACTION_CATEGORIES_QUERY,
@@ -200,6 +202,62 @@ async def split_transaction(
         raise APIError(f"Split failed: {msg}")
 
     return result.get("transaction", {})
+
+
+async def create_transaction(
+    client: MonarchClient,
+    date: str,
+    account_id: str,
+    amount: float,
+    merchant_name: str,
+    category_id: str,
+    notes: str = "",
+    update_balance: bool = False,
+) -> dict:
+    """Create a new manual transaction."""
+    variables = {
+        "input": {
+            "date": date,
+            "accountId": account_id,
+            "amount": round(amount, 2),
+            "merchantName": merchant_name,
+            "categoryId": category_id,
+            "notes": notes,
+            "shouldUpdateBalance": update_balance,
+        }
+    }
+
+    data = await client._request(CREATE_TRANSACTION_MUTATION, variables)
+    result = data.get("createTransaction", {})
+
+    if result.get("errors"):
+        errors = result["errors"]
+        msg = errors.get("message") or str(errors.get("fieldErrors", []))
+        raise APIError(f"Create transaction failed: {msg}")
+
+    return result.get("transaction", {})
+
+
+async def delete_transaction(
+    client: MonarchClient,
+    transaction_id: str,
+) -> bool:
+    """Delete a transaction."""
+    variables = {
+        "input": {
+            "transactionId": transaction_id,
+        }
+    }
+
+    data = await client._request(DELETE_TRANSACTION_MUTATION, variables)
+    result = data.get("deleteTransaction", {})
+
+    if result.get("errors"):
+        errors = result["errors"]
+        msg = errors.get("message") or str(errors.get("fieldErrors", []))
+        raise APIError(f"Delete transaction failed: {msg}")
+
+    return result.get("deleted", False)
 
 
 # --- Resource Definitions ---
@@ -495,6 +553,93 @@ async def split_transaction_tool(
     except Exception as e:
         logger.error(f"Error splitting transaction: {e}")
         return {"error": str(e), "transaction": None, "success": False}
+
+
+@mcp.tool(
+    name="create_transaction",
+    description="Create a new manual transaction in Monarch Money. Use for adding transactions to manual accounts like tracking gifts, loans, or other financial events not captured by linked accounts.",
+)
+async def create_transaction_tool(
+    date: str = Field(
+        description="Transaction date in YYYY-MM-DD format. Example: '2025-01-15'",
+    ),
+    account_id: str = Field(
+        description="The ID of the account for this transaction. Get IDs from list_accounts tool. Must be a manual account.",
+    ),
+    amount: float = Field(
+        description="Transaction amount. Use negative values for expenses/debits, positive for income/credits. Example: -297.12 for an expense.",
+    ),
+    merchant_name: str = Field(
+        description="Name of the merchant or payee for this transaction.",
+    ),
+    category_id: str = Field(
+        description="Category ID for this transaction. Get IDs from list_categories tool.",
+    ),
+    notes: Optional[str] = Field(
+        default="",
+        description="Optional notes or description for the transaction.",
+    ),
+    update_balance: bool = Field(
+        default=False,
+        description="Whether to update the account balance. Set to true for manual accounts where you want the balance to reflect this transaction.",
+    ),
+) -> dict[str, Any]:
+    """Create a new manual transaction in Monarch Money."""
+    try:
+        client = _get_client()
+
+        result = await create_transaction(
+            client,
+            date=date,
+            account_id=account_id,
+            amount=amount,
+            merchant_name=merchant_name,
+            category_id=category_id,
+            notes=notes or "",
+            update_balance=update_balance,
+        )
+
+        return {
+            "transaction": result,
+            "success": True,
+            "message": f"Transaction created successfully with ID {result.get('id', 'unknown')}",
+        }
+    except AuthenticationError as e:
+        return {"error": str(e), "transaction": None, "success": False}
+    except APIError as e:
+        return {"error": str(e), "transaction": None, "success": False}
+    except Exception as e:
+        logger.error(f"Error creating transaction: {e}")
+        return {"error": str(e), "transaction": None, "success": False}
+
+
+@mcp.tool(
+    name="delete_transaction",
+    description="Delete a transaction from Monarch Money. Use with caution - this action cannot be undone.",
+)
+async def delete_transaction_tool(
+    transaction_id: str = Field(
+        description="The ID of the transaction to delete. Get IDs from list_transactions.",
+    ),
+) -> dict[str, Any]:
+    """Delete a transaction from Monarch Money."""
+    try:
+        client = _get_client()
+
+        deleted = await delete_transaction(client, transaction_id)
+
+        return {
+            "deleted": deleted,
+            "success": deleted,
+            "message": f"Transaction {transaction_id} deleted successfully" if deleted else f"Failed to delete transaction {transaction_id}",
+        }
+    except AuthenticationError as e:
+        return {"error": str(e), "deleted": False, "success": False}
+    except APIError as e:
+        return {"error": str(e), "deleted": False, "success": False}
+    except Exception as e:
+        logger.error(f"Error deleting transaction: {e}")
+        return {"error": str(e), "deleted": False, "success": False}
 
 
 # ASGI application for HTTP transport (uvicorn)
