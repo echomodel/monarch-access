@@ -1,6 +1,6 @@
 # Monarch Access
 
-Lightweight CLI and Python SDK for accessing [Monarch Money](https://www.monarchmoney.com/) financial data.
+Lightweight CLI and Python SDK for accessing [Monarch Money](https://www.monarch.com/) financial data.
 
 ```
 $ monarch accounts
@@ -38,18 +38,12 @@ Total: $3,222.35
 ## Installation
 
 ```bash
-pip install git+https://github.com/krisrowe/monarch-access.git
+pipx install git+https://github.com/krisrowe/monarch-access.git
 ```
 
-Or clone and install locally:
-
-```bash
-git clone https://github.com/krisrowe/monarch-access.git
-cd monarch-access
-pip install .
-```
-
-This installs the `monarch` command globally.
+This installs two commands:
+- **`monarch`** - The CLI tool for direct command-line use
+- **`monarch-mcp`** - The MCP server for AI assistant integration (see [MCP Server](#mcp-server-for-ai-assistants))
 
 ## Requirements
 
@@ -58,9 +52,9 @@ This installs the `monarch` command globally.
 
 ## Authentication
 
-Monarch Money doesn't have a public API, so you need to grab your session token from the browser:
+Monarch doesn't have a public API, so you need to grab your session token from the browser:
 
-1. Go to https://app.monarchmoney.com/ and log in
+1. Go to https://app.monarch.com/ and log in
 2. Open DevTools (F12) → Console tab
 3. Paste and run:
    ```javascript
@@ -73,6 +67,8 @@ Monarch Money doesn't have a public API, so you need to grab your session token 
    ```
 
 The token is saved to `~/.config/monarch/token` and typically lasts several months. You'll need to repeat this when it expires.
+
+**Environment variable override:** You can also set `MONARCH_TOKEN` environment variable, which takes precedence over the token file.
 
 ## CLI Usage
 
@@ -220,72 +216,41 @@ async def main():
 asyncio.run(main())
 ```
 
-## MCP Server (AI Assistant Integration)
+## MCP Server for AI Assistants
 
-This project includes a **Model Context Protocol (MCP) server** that enables AI assistants to access your Monarch Money data directly.
+The `monarch-mcp` command exposes Monarch data via the [Model Context Protocol](https://modelcontextprotocol.io/), enabling AI assistants like Claude and Gemini to access your financial data.
 
-### What is MCP?
-
-[Model Context Protocol](https://modelcontextprotocol.io/) is an open standard that allows AI assistants like **Claude Desktop**, **Gemini CLI**, and other agentic tools to securely connect to external data sources. With the Monarch MCP Server, you can ask your AI assistant things like:
-
-- *"Show me my spending on groceries this month"*
-- *"Find all transactions that need review and categorize them"*
-- *"What are my current account balances?"*
-- *"Split this transaction between two categories"*
-
-The MCP server exposes the same functionality as the CLI through a standardized protocol, allowing AI assistants to query and update your financial data on your behalf.
-
-### Quick Start
+### Register with Claude Code
 
 ```bash
-# Build the Docker image
-docker build -t monarch-mcp-server:latest .
-
-# Run with your token
-docker run -d --name monarch-mcp-server -p 8000:8000 \
-  -e MONARCH_TOKEN="your_token" monarch-mcp-server:latest
+claude mcp add --scope user monarch monarch-mcp
 ```
 
-Then configure your MCP client (Claude Desktop, Gemini CLI, etc.) to connect.
+### Register with Gemini CLI
 
-**For complete setup instructions, client configurations, and troubleshooting:**
-→ **[MCP Server Documentation](./MCP-SERVER.md)**
-
-**For detailed tool/resource reference:**
-→ **[Tools Reference](./docs/TOOLS.md)**
-
-## Architecture
-
-This project follows a layered architecture:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Access Layer                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │     CLI      │  │  MCP Server  │  │  Third-party │  │
-│  │  (click)     │  │  (FastMCP)   │  │     Apps     │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
-└─────────┼─────────────────┼─────────────────┼──────────┘
-          │                 │                 │
-          ▼                 ▼                 ▼
-┌─────────────────────────────────────────────────────────┐
-│                   Provider Layer                        │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │              Provider Interface                   │  │
-│  │  get_accounts(), get_transactions(), etc.        │  │
-│  └──────────────────────────────────────────────────┘  │
-│  ┌──────────────────┐  ┌────────────────────────────┐  │
-│  │   APIProvider    │  │      LocalProvider         │  │
-│  │  (Monarch API)   │  │    (Local TinyDB)          │  │
-│  └──────────────────┘  └────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
+```bash
+gemini mcp add monarch monarch-mcp
 ```
 
-The CLI, MCP server, and third-party applications all use the same Provider interface, ensuring consistent behavior and making the SDK reusable.
+### Available Tools
 
-## Future Enhancements
+| Tool | Description |
+|------|-------------|
+| `list_accounts` | Get all accounts with balances |
+| `list_categories` | Get all transaction categories |
+| `list_transactions` | Query transactions with filters |
+| `get_transaction` | Get a single transaction |
+| `update_transaction` | Update category, notes, etc. |
+| `mark_transactions_reviewed` | Bulk mark as reviewed |
+| `split_transaction` | Split across categories |
+| `create_transaction` | Create manual transaction |
+| `delete_transaction` | Delete a transaction |
 
-- **User configuration** (`~/.config/monarch/config.yaml`): Store user preferences like default columns for transaction lists, default output format, etc.
+For detailed documentation, see **[MCP-SERVER.md](./MCP-SERVER.md)**.
+
+## Development
+
+See **[CONTRIBUTING.md](./CONTRIBUTING.md)** for development setup, testing, and architecture.
 
 ## License
 

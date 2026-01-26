@@ -14,8 +14,8 @@ from typing import Any, Optional
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
-from monarch.client import MonarchClient, AuthenticationError, APIError
-from monarch.queries import (
+from ..client import MonarchClient, AuthenticationError, APIError
+from ..queries import (
     ACCOUNTS_QUERY,
     BULK_UPDATE_TRANSACTIONS_MUTATION,
     CREATE_TRANSACTION_MUTATION,
@@ -39,13 +39,10 @@ mcp = FastMCP("monarch")
 def _get_client() -> MonarchClient:
     """Get MonarchClient instance.
 
-    Supports MONARCH_TOKEN environment variable for Docker/container usage.
-    Falls back to token file (~/.config/monarch/token) if env var not set.
+    Token resolution is handled by the config module:
+    1. MONARCH_TOKEN environment variable
+    2. Token file at ~/.config/monarch/token (or MONARCH_TOKEN_FILE)
     """
-    token = os.getenv("MONARCH_TOKEN")
-    if token:
-        logger.info("Using MONARCH_TOKEN from environment variable")
-        return MonarchClient(token=token)
     return MonarchClient()
 
 
@@ -642,12 +639,23 @@ async def delete_transaction_tool(
         return {"error": str(e), "deleted": False, "success": False}
 
 
+# =============================================================================
+# Server entry points
+# =============================================================================
+
+
+def run_server():
+    """Run the MCP server with stdio transport.
+
+    This is the entry point for the `monarch-mcp` command.
+    """
+    mcp.run()
+
+
 # ASGI application for HTTP transport (uvicorn)
+# Usage: uvicorn monarch.mcp.server:mcp_app --host 0.0.0.0 --port 8000
 mcp_app = mcp.streamable_http_app()
 
-# Stdio transport support
-if __name__ == "__main__":
-    import sys
 
-    if len(sys.argv) > 1 and sys.argv[1] == "--stdio":
-        mcp.run(transport="stdio")
+if __name__ == "__main__":
+    run_server()

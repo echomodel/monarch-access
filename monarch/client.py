@@ -5,15 +5,16 @@ from typing import Optional
 
 import aiohttp
 
-DEFAULT_TOKEN_FILE = Path.home() / ".config" / "monarch" / "token"
-GRAPHQL_URL = "https://api.monarchmoney.com/graphql"
+from .config import get_token, get_token_file, save_token as config_save_token
+
+GRAPHQL_URL = "https://api.monarch.com/graphql"
 
 HEADERS = {
     "Content-Type": "application/json",
     "Accept": "*/*",
     "Accept-Language": "en-US,en;q=0.9",
-    "Origin": "https://app.monarchmoney.com",
-    "Referer": "https://app.monarchmoney.com/",
+    "Origin": "https://app.monarch.com",
+    "Referer": "https://app.monarch.com/",
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 }
 
@@ -39,28 +40,16 @@ class MonarchClient:
     def __init__(
         self,
         token: Optional[str] = None,
-        token_file: Path = DEFAULT_TOKEN_FILE,
     ):
-        self._token_file = token_file
-        self._token = token
-
-        if not self._token:
-            self._load_token()
-
-    def _load_token(self) -> None:
-        """Load token from file."""
-        try:
-            self._token = self._token_file.read_text().strip()
-        except FileNotFoundError:
-            pass
+        self._token = token or get_token()
+        self._token_file = get_token_file()
 
     def save_token(self) -> None:
         """Save token to file."""
         if not self._token:
             raise AuthenticationError("No token to save")
 
-        self._token_file.parent.mkdir(parents=True, exist_ok=True)
-        self._token_file.write_text(self._token)
+        config_save_token(self._token)
 
     @property
     def is_authenticated(self) -> bool:
@@ -70,7 +59,7 @@ class MonarchClient:
         if not self._token:
             raise AuthenticationError(
                 "Not authenticated. Get token from browser:\n"
-                "1. Login to https://app.monarchmoney.com/\n"
+                "1. Login to https://app.monarch.com/\n"
                 "2. DevTools (F12) -> Console\n"
                 "3. Run: JSON.parse(JSON.parse(localStorage.getItem('persist:root')).user).token"
             )

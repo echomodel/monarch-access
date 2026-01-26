@@ -4,120 +4,17 @@ This document outlines how to configure the Monarch MCP Server for use with Clau
 
 ## Prerequisites
 
-- **Docker Setup Complete:** Follow the Docker setup steps in [MCP-SERVER.md](../MCP-SERVER.md) to build the Docker image.
-- **Monarch Token:** Obtain your token via the CLI (`monarch auth`) - see main [README.md](../README.md#authentication).
+- **Monarch Access Installed:** `pipx install git+https://github.com/krisrowe/monarch-access.git`
+- **Monarch Token:** Obtain your token via `monarch auth` - see [README.md](../README.md#authentication)
 - **Claude Code Installed:** [Install Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 
 ## Quick Start
 
 ```bash
-claude mcp add --scope user monarch -- docker run -i --rm \
-  -v ~/.config/monarch:/root/.config/monarch:ro \
-  monarch-mcp-server:latest python server-stdio.py
+claude mcp add --scope user monarch monarch-mcp
 ```
 
 This adds the Monarch MCP server to your user scope so it's available in all projects.
-
-## Configuration Options
-
-### Option A: CLI Command (Recommended)
-
-The simplest way to add the MCP server:
-
-```bash
-claude mcp add --scope user monarch -- docker run -i --rm \
-  -v ~/.config/monarch:/root/.config/monarch:ro \
-  monarch-mcp-server:latest python server-stdio.py
-```
-
-**Key points:**
-- `--scope user` makes the server available across all projects
-- `--` separates Claude's flags from the Docker command
-- The config mount method shares your existing token, so `monarch auth` refreshes work automatically
-
-### Option B: Manual Configuration
-
-For team sharing or more control, create a `.mcp.json` file.
-
-**User scope** (`~/.claude.json`):
-
-```json
-{
-  "mcpServers": {
-    "monarch": {
-      "type": "stdio",
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-v", "~/.config/monarch:/root/.config/monarch:ro",
-        "monarch-mcp-server:latest",
-        "python", "server-stdio.py"
-      ]
-    }
-  }
-}
-```
-
-**Project scope** (`.mcp.json` in project root):
-
-```json
-{
-  "mcpServers": {
-    "monarch": {
-      "type": "stdio",
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-v", "~/.config/monarch:/root/.config/monarch:ro",
-        "monarch-mcp-server:latest",
-        "python", "server-stdio.py"
-      ]
-    }
-  }
-}
-```
-
-### Option C: Environment Variable Method
-
-If you prefer to pass the token directly instead of mounting the config:
-
-```bash
-claude mcp add --scope user monarch -- docker run -i --rm \
-  -e MONARCH_TOKEN="$(cat ~/.config/monarch/token)" \
-  monarch-mcp-server:latest python server-stdio.py
-```
-
-Or in JSON:
-
-```json
-{
-  "mcpServers": {
-    "monarch": {
-      "type": "stdio",
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-e", "MONARCH_TOKEN",
-        "monarch-mcp-server:latest",
-        "python", "server-stdio.py"
-      ],
-      "env": {
-        "MONARCH_TOKEN": "your_token_here"
-      }
-    }
-  }
-}
-```
-
-## Configuration Scope
-
-| Scope | Location | Use Case |
-|-------|----------|----------|
-| `user` | `~/.claude.json` | Personal use across all projects (recommended) |
-| `project` | `.mcp.json` in project root | Team sharing |
-| `local` | Local to current session | Temporary testing |
-
-For Monarch, **user scope is recommended** since you'll want financial data access from various projects.
 
 ## Verifying Configuration
 
@@ -125,11 +22,19 @@ For Monarch, **user scope is recommended** since you'll want financial data acce
 # List all configured MCP servers
 claude mcp list
 
-# Get details for the monarch server
-claude mcp get monarch
+# You should see monarch listed with "Connected" status
 ```
 
-Within a Claude Code session, use the `/mcp` command to check server status.
+Within a Claude Code session, use `/mcp` to check server status.
+
+## Configuration Scope
+
+| Scope | Flag | Use Case |
+|-------|------|----------|
+| `user` | `--scope user` | Personal use across all projects (recommended) |
+| `project` | `--scope project` | Only current project |
+
+For Monarch, **user scope is recommended** since you'll want financial data access from various projects.
 
 ## Using with Claude Code
 
@@ -145,58 +50,92 @@ Once configured, interact naturally:
 
 ```bash
 # Remove the server
-claude mcp remove monarch --scope user
+claude mcp remove --scope user monarch
 
 # Update by removing and re-adding
-claude mcp remove monarch --scope user
-claude mcp add --scope user monarch -- docker run ...
+claude mcp remove --scope user monarch
+claude mcp add --scope user monarch monarch-mcp
+```
+
+## Manual Configuration
+
+For team sharing or fine-grained control, you can manually edit config files.
+
+**User scope** (`~/.claude/settings.local.json`):
+
+```json
+{
+  "mcpServers": {
+    "monarch": {
+      "command": "monarch-mcp"
+    }
+  }
+}
+```
+
+**Project scope** (`.mcp.json` in project root):
+
+```json
+{
+  "mcpServers": {
+    "monarch": {
+      "command": "monarch-mcp"
+    }
+  }
+}
 ```
 
 ## Troubleshooting
 
 **Server not connecting:**
-- Ensure Docker is running: `docker ps`
-- Check the Docker image exists: `docker images | grep monarch-mcp-server`
-- Rebuild if needed: `docker build -t monarch-mcp-server:latest .`
+
+1. Verify `monarch-mcp` is in PATH:
+   ```bash
+   which monarch-mcp
+   ```
+
+2. Test the server directly:
+   ```bash
+   monarch-mcp
+   ```
+   (Press Ctrl+C to exit)
+
+3. Verify token is configured:
+   ```bash
+   monarch accounts
+   ```
 
 **Token expiration:**
 - Run `monarch auth "NEW_TOKEN"` to refresh
-- With config mount method: No re-configuration needed
-- With env var method: Re-add the server with the new token
+- No re-configuration needed - the server reads from the token file
 
 **Permission errors:**
-- Claude Code prompts for approval on project-scoped servers from `.mcp.json`
-- User-scoped servers in `~/.claude.json` don't require approval
+- Claude Code prompts for approval on project-scoped servers
+- User-scoped servers don't require approval
 
-**Debug mode:**
-For detailed server logs, run the Docker container manually:
+## Environment Variable Override
+
+If you need to use a different token than the default file:
+
 ```bash
-docker run -i --rm \
-  -v ~/.config/monarch:/root/.config/monarch:ro \
-  monarch-mcp-server:latest python server-stdio.py
+MONARCH_TOKEN="your_token" claude
 ```
 
-## Security Considerations
+Or in manual config:
 
-**Token Storage:**
-- With env var method, the actual token value may be stored in plain text
-- Config mount method is more secure (token stays in one place)
-- Never commit `~/.claude.json` or `.mcp.json` containing tokens to version control
-
-**File Permissions:**
-```bash
-chmod 600 ~/.claude.json
+```json
+{
+  "mcpServers": {
+    "monarch": {
+      "command": "monarch-mcp",
+      "env": {
+        "MONARCH_TOKEN": "your_token_here"
+      }
+    }
+  }
+}
 ```
-
-## Comparison with Other Clients
-
-| Feature | Claude Code | Claude Desktop | Gemini CLI |
-|---------|-------------|----------------|------------|
-| Config file | `~/.claude.json` or `.mcp.json` | Platform-specific | `~/.gemini/settings.json` |
-| Add command | `claude mcp add` | Manual JSON edit | `gemini mcp add` |
-| Transport | stdio | stdio or HTTP | stdio or HTTP |
-| Scope levels | user, project, local | N/A | user, project |
 
 ---
 
-For more details on Claude Code MCP server configuration, see the [official documentation](https://docs.anthropic.com/en/docs/claude-code/mcp).
+For more details on Claude Code MCP configuration, see the [official documentation](https://docs.anthropic.com/en/docs/claude-code/mcp).
