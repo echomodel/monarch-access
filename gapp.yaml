@@ -1,5 +1,6 @@
 service:
   entrypoint: monarch.mcp.server:mcp_app
+  mcp_path: /mcp
   public: true
   env:
     LOG_LEVEL: INFO
