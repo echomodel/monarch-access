@@ -17,7 +17,6 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import JSONResponse
 
 from ..client import MonarchClient, AuthenticationError, APIError
@@ -696,7 +695,6 @@ async def _lifespan(app):
 
 
 mcp_app = Starlette(lifespan=_lifespan)
-mcp_app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 mcp_app.add_middleware(TokenMiddleware)
 
 
