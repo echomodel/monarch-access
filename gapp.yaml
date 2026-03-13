@@ -1,6 +1,8 @@
 service:
   entrypoint: monarch.mcp.server:mcp_app
   public: true
+  env:
+    LOG_LEVEL: INFO
   auth:
     enabled: true
     strategy: bearer
