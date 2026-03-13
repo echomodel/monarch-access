@@ -40,8 +40,16 @@ logger = logging.getLogger(__name__)
 # Request-scoped token from HTTP clients
 _request_token: ContextVar[str | None] = ContextVar("_request_token", default=None)
 
-# Initialize FastMCP server
-mcp = FastMCP("monarch")
+# On Cloud Run, disable MCP's DNS rebinding protection — the load balancer
+# and gapp's auth middleware handle host validation. Locally, use the
+# default FastMCP constructor which enables localhost-only protection.
+if os.environ.get("K_SERVICE"):
+    from mcp.server.transport_security import TransportSecuritySettings
+    mcp = FastMCP("monarch", transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
+    ))
+else:
+    mcp = FastMCP("monarch")
 
 
 def _get_client() -> MonarchClient:

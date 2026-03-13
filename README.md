@@ -248,6 +248,26 @@ gemini mcp add monarch monarch-mcp
 
 For detailed documentation, see **[MCP-SERVER.md](./MCP-SERVER.md)**.
 
+## Cloud Deployment (Optional)
+
+This repo is configured for cloud deployment to GCP Cloud Run via [gapp](https://github.com/krisrowe/gapp). This deploys monarch-access as an HTTP MCP server with credential mediation — your Monarch session token stays on the server and is never exposed to clients. Clients authenticate with a personal access token (PAT) instead.
+
+```bash
+# Install gapp CLI
+pipx install git+https://github.com/krisrowe/gapp.git
+
+# Initialize, attach a GCP project, and deploy
+cd monarch-access
+gapp setup your-gcp-project-id
+gapp deploy
+
+# Register a user and create a PAT
+gapp users register user@example.com "MONARCH_SESSION_TOKEN"
+gapp tokens create user@example.com
+```
+
+See the [gapp repo](https://github.com/krisrowe/gapp) for full documentation on deployment, user management, and client configuration.
+
 ## Development
 
 See **[CONTRIBUTING.md](./CONTRIBUTING.md)** for development setup, testing, and architecture.

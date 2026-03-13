@@ -1,3 +1,14 @@
+# gapp deployment manifest — optional cloud deployment configuration.
+#
+# This file configures deployment to GCP Cloud Run via gapp
+# (https://github.com/krisrowe/gapp). gapp provides simplified,
+# secure, scalable cloud deployment with credential mediation,
+# so upstream tokens never leave the server.
+#
+# This is NOT required to use monarch-access. The solution runs
+# independently as a local CLI, Python SDK, or stdio MCP server.
+# See README.md for standard installation and usage.
+
 service:
   entrypoint: monarch.mcp.server:mcp_app
   mcp_path: /mcp
