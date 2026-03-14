@@ -12,7 +12,7 @@
 service:
   entrypoint: monarch.mcp.server:mcp_app
   mcp_path: /mcp
-  runtime: 413feef
+  runtime: cfbdce7
   public: true
   env:
     LOG_LEVEL: INFO
