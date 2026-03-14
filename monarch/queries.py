@@ -279,3 +279,39 @@ mutation Common_DeleteTransactionMutation($input: DeleteTransactionMutationInput
     }
 }
 """
+
+RECURRING_TRANSACTION_ITEMS_QUERY = """
+query Web_GetUpcomingRecurringTransactionItems($startDate: Date!, $endDate: Date!, $filters: RecurringTransactionFilter) {
+  recurringTransactionItems(
+    startDate: $startDate
+    endDate: $endDate
+    filters: $filters
+  ) {
+    stream {
+      id
+      frequency
+      amount
+      isApproximate
+      merchant {
+        id
+        name
+        logoUrl
+      }
+    }
+    date
+    isPast
+    transactionId
+    amount
+    amountDiff
+    category {
+      id
+      name
+    }
+    account {
+      id
+      displayName
+      logoUrl
+    }
+  }
+}
+"""

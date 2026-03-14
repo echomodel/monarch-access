@@ -74,6 +74,23 @@ class CategoriesProvider(Protocol):
 
 
 @runtime_checkable
-class Provider(TransactionsProvider, AccountsProvider, CategoriesProvider, Protocol):
+class RecurringProvider(Protocol):
+    """Interface for recurring transaction operations."""
+
+    def get_recurring_transaction_items(
+        self,
+        start_date: str,
+        end_date: str,
+    ) -> list[dict]:
+        """Get recurring transaction items for a date range.
+
+        Returns list of recurring items with stream, merchant, account,
+        category, and payment status details.
+        """
+        ...
+
+
+@runtime_checkable
+class Provider(TransactionsProvider, AccountsProvider, CategoriesProvider, RecurringProvider, Protocol):
     """Combined provider interface for all operations."""
     pass

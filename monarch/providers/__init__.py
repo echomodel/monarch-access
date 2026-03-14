@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
-from .base import Provider, TransactionsProvider, AccountsProvider, CategoriesProvider
+from .base import Provider, TransactionsProvider, AccountsProvider, CategoriesProvider, RecurringProvider
 from .api import APIProvider
 
 if TYPE_CHECKING:
@@ -15,6 +15,7 @@ __all__ = [
     "TransactionsProvider",
     "AccountsProvider",
     "CategoriesProvider",
+    "RecurringProvider",
     "APIProvider",
     "LocalProvider",
     "get_provider",

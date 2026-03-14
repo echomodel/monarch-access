@@ -9,6 +9,7 @@ from ...queries import (
     BULK_UPDATE_TRANSACTIONS_MUTATION,
     CREATE_TRANSACTION_MUTATION,
     GET_TRANSACTION_QUERY,
+    RECURRING_TRANSACTION_ITEMS_QUERY,
     SPLIT_TRANSACTION_MUTATION,
     TRANSACTION_CATEGORIES_QUERY,
     TRANSACTIONS_QUERY,
@@ -239,6 +240,27 @@ class APIProvider:
             raise APIError(f"Split failed: {msg}")
 
         return result.get("transaction", {})
+
+    def get_recurring_transaction_items(
+        self,
+        start_date: str,
+        end_date: str,
+    ) -> list[dict]:
+        """Get recurring transaction items for a date range."""
+        return self._run(self._get_recurring_transaction_items(start_date, end_date))
+
+    async def _get_recurring_transaction_items(
+        self,
+        start_date: str,
+        end_date: str,
+    ) -> list[dict]:
+        variables = {
+            "startDate": start_date,
+            "endDate": end_date,
+        }
+
+        data = await self._client._request(RECURRING_TRANSACTION_ITEMS_QUERY, variables)
+        return data.get("recurringTransactionItems", [])
 
     def create_transaction(
         self,

@@ -26,6 +26,7 @@ from ..queries import (
     CREATE_TRANSACTION_MUTATION,
     DELETE_TRANSACTION_MUTATION,
     GET_TRANSACTION_QUERY,
+    RECURRING_TRANSACTION_ITEMS_QUERY,
     SPLIT_TRANSACTION_MUTATION,
     TRANSACTION_CATEGORIES_QUERY,
     TRANSACTIONS_QUERY,
@@ -217,6 +218,21 @@ async def split_transaction(
         raise APIError(f"Split failed: {msg}")
 
     return result.get("transaction", {})
+
+
+async def get_recurring_transaction_items(
+    client: MonarchClient,
+    start_date: str,
+    end_date: str,
+) -> list[dict]:
+    """Get recurring transaction items for a date range."""
+    variables: dict[str, Any] = {
+        "startDate": start_date,
+        "endDate": end_date,
+    }
+
+    data = await client._request(RECURRING_TRANSACTION_ITEMS_QUERY, variables)
+    return data.get("recurringTransactionItems", [])
 
 
 async def create_transaction(
@@ -655,6 +671,37 @@ async def delete_transaction_tool(
     except Exception as e:
         logger.error(f"Error deleting transaction: {e}")
         return {"error": str(e), "deleted": False, "success": False}
+
+
+@mcp.tool(
+    name="list_recurring",
+    description="List tracked recurring obligations (bills, subscriptions, loan payments, credit card payments) from Monarch Money. Returns the stable list of recurring streams — one entry per obligation — with current-month payment status. Each item includes merchant, expected amount, frequency, category, account, and whether this month's payment has been made.",
+)
+async def list_recurring_tool() -> dict[str, Any]:
+    """Retrieve the list of recurring obligations from Monarch Money."""
+    try:
+        from ..recurring import _trailing_year_range, collapse_to_streams
+
+        client = _get_client()
+
+        start_date, end_date = _trailing_year_range()
+        items = await get_recurring_transaction_items(
+            client,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        streams = collapse_to_streams(items)
+
+        return {
+            "recurring": streams,
+            "count": len(streams),
+        }
+    except AuthenticationError as e:
+        return {"error": str(e), "recurring": [], "count": 0}
+    except Exception as e:
+        logger.error(f"Error listing recurring items: {e}")
+        return {"error": str(e), "recurring": [], "count": 0}
 
 
 # =============================================================================

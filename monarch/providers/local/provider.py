@@ -16,6 +16,7 @@ class LocalProvider:
         self._transactions = self._db.table("transactions")
         self._accounts = self._db.table("accounts")
         self._categories = self._db.table("categories")
+        self._recurring = self._db.table("recurring")
 
     def get_transactions(
         self,
@@ -119,6 +120,24 @@ class LocalProvider:
     def get_categories(self) -> list[dict]:
         """Get all transaction categories."""
         return self._categories.all()
+
+    def get_recurring_transaction_items(
+        self,
+        start_date: str,
+        end_date: str,
+    ) -> list[dict]:
+        """Get recurring transaction items for a date range."""
+        all_items = self._recurring.all()
+
+        # Filter by date range
+        filtered = [
+            item for item in all_items
+            if start_date <= item.get("date", "") <= end_date
+        ]
+
+        # Sort by date
+        filtered.sort(key=lambda item: item.get("date", ""))
+        return filtered
 
     def create_transaction(
         self,

@@ -118,9 +118,40 @@ def generate_test_data(output_path: Path = None) -> dict:
                     transactions_table.insert(txn)
                     total_txn_count += 1
 
+    # Insert recurring items with dates for current month
+    recurring_table = db.table("recurring")
+    recurring_seeds = seed.get("recurring", [])
+    recurring_count = 0
+
+    for rec_seed in recurring_seeds:
+        # Generate items for each of the last 3 months
+        for month_offset in range(3):
+            target_month = end_date.month - month_offset
+            target_year = end_date.year
+            if target_month <= 0:
+                target_month += 12
+                target_year -= 1
+
+            item_date = datetime(target_year, target_month, 15)
+            is_past = item_date.date() < end_date.date()
+
+            item = {
+                "stream": rec_seed["stream"],
+                "date": item_date.strftime("%Y-%m-%d"),
+                "isPast": is_past,
+                "transactionId": generate_transaction_id() if (is_past and random.random() < 0.8) else None,
+                "amount": rec_seed["stream"]["amount"],
+                "amountDiff": 0,
+                "category": rec_seed["category"],
+                "account": rec_seed["account"],
+            }
+            recurring_table.insert(item)
+            recurring_count += 1
+
     db.close()
 
     print(f"Generated {total_txn_count} transactions across {len(seed['accounts'])} accounts")
+    print(f"Generated {recurring_count} recurring items from {len(recurring_seeds)} streams")
     print(f"Data written to: {output_path}")
 
     return {"transactions": total_txn_count, "accounts": len(seed["accounts"]), "categories": len(seed["categories"])}

@@ -8,7 +8,7 @@ from typing import Optional
 
 import click
 
-from . import accounts, net_worth, transactions
+from . import accounts, net_worth, recurring, transactions
 from .client import AuthenticationError, APIError
 from .providers import get_provider
 
@@ -426,6 +426,44 @@ def _update_transaction(
         return json.dumps(updated, indent=2, default=str)
     else:
         return transactions.format_single_text(updated)
+
+
+@cli.command("recurring")
+@click.option("--format", "output_format", type=click.Choice(["text", "json", "csv"]), default="text", help="Output format")
+def list_recurring(output_format: str):
+    """List tracked recurring obligations (bills, subscriptions, loan payments).
+
+    Shows the stable list of recurring streams with current-month payment status.
+    """
+    try:
+        result = _list_recurring(output_format)
+        click.echo(result)
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+
+
+def _list_recurring(output_format: str) -> str:
+    """Implementation of list recurring."""
+    provider = get_provider()
+
+    start_date, end_date = recurring._trailing_year_range()
+    items = provider.get_recurring_transaction_items(
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    streams = recurring.collapse_to_streams(items)
+
+    if output_format == "json":
+        return json.dumps(streams, indent=2, default=str)
+    elif output_format == "csv":
+        return recurring.format_csv(streams)
+    else:
+        return recurring.format_text(streams)
 
 
 @cli.command("accounts")

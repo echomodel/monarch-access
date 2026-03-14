@@ -232,5 +232,51 @@
     {"id": "cat_010", "name": "Salary", "icon": "briefcase", "group": {"id": "grp_007", "name": "Income", "type": "income"}},
     {"id": "cat_011", "name": "Transfer", "icon": "exchange", "group": {"id": "grp_008", "name": "Transfer", "type": "transfer"}},
     {"id": "cat_012", "name": "Healthcare", "icon": "medkit", "group": {"id": "grp_009", "name": "Health", "type": "expense"}}
+  ],
+  "recurring": [
+    {
+      "stream": {
+        "id": "stream_001",
+        "frequency": "monthly",
+        "amount": -2500.00,
+        "isApproximate": false,
+        "merchant": {"id": "merch_fairview_bank_mortgage", "name": "Fairview Bank Mortgage", "logoUrl": null}
+      },
+      "category": {"id": "cat_009", "name": "Mortgage"},
+      "account": {"id": "acc_001", "displayName": "Fairview Checking", "logoUrl": null}
+    },
+    {
+      "stream": {
+        "id": "stream_002",
+        "frequency": "monthly",
+        "amount": -450.00,
+        "isApproximate": false,
+        "merchant": {"id": "merch_autofinance_co", "name": "AutoFinance Co", "logoUrl": null}
+      },
+      "category": {"id": "cat_004", "name": "Vehicle Insurance"},
+      "account": {"id": "acc_001", "displayName": "Fairview Checking", "logoUrl": null}
+    },
+    {
+      "stream": {
+        "id": "stream_003",
+        "frequency": "monthly",
+        "amount": -15.49,
+        "isApproximate": false,
+        "merchant": {"id": "merch_netflix", "name": "Netflix", "logoUrl": null}
+      },
+      "category": {"id": "cat_006", "name": "Entertainment"},
+      "account": {"id": "acc_004", "displayName": "Platinum Card", "logoUrl": null}
+    },
+    {
+      "stream": {
+        "id": "stream_004",
+        "frequency": "monthly",
+        "amount": -10.99,
+        "isApproximate": false,
+        "merchant": {"id": "merch_spotify", "name": "Spotify", "logoUrl": null}
+      },
+      "category": {"id": "cat_006", "name": "Entertainment"},
+      "account": {"id": "acc_004", "displayName": "Platinum Card", "logoUrl": null}
+    }
   ]
 }
