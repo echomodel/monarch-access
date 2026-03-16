@@ -281,8 +281,8 @@ mutation Common_DeleteTransactionMutation($input: DeleteTransactionMutationInput
 """
 
 MARK_AS_NOT_RECURRING_MUTATION = """
-mutation Common_MarkAsNotRecurring($input: MarkAsNotRecurringMutationInput!) {
-    markAsNotRecurring(input: $input) {
+mutation Common_MarkAsNotRecurring($id: ID!) {
+    markAsNotRecurring(id: $id) {
         success
         errors {
             fieldErrors {
