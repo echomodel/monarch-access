@@ -298,6 +298,237 @@ mutation Common_UpdateMerchant($input: UpdateMerchantInput!) {
 }
 """
 
+# =============================================================================
+# Merchant Queries & Mutations
+# =============================================================================
+
+MERCHANT_SEARCH_QUERY = """
+query($search: String) {
+    merchants(search: $search) {
+        id
+        name
+        logoUrl
+        transactionsCount
+        canBeDeleted
+        createdAt
+        recurringTransactionStream {
+            id
+            frequency
+            amount
+            baseDate
+            isActive
+        }
+    }
+}
+"""
+
+GET_MERCHANT_QUERY = """
+query Common_GetEditMerchant($merchantId: ID!) {
+    merchant(id: $merchantId) {
+        id
+        name
+        logoUrl
+        transactionCount
+        ruleCount
+        canBeDeleted
+        hasActiveRecurringStreams
+        recurringTransactionStream {
+            id
+            frequency
+            amount
+            baseDate
+            isActive
+        }
+    }
+}
+"""
+
+GET_CLOUDINARY_UPLOAD_INFO_MUTATION = """
+mutation Common_GetCloudinaryUploadInfo($input: GetLogoCloudinaryUploadInfoMutationInput!) {
+    getCloudinaryUploadInfo(input: $input) {
+        info {
+            path
+            requestParams {
+                timestamp
+                folder
+                signature
+                api_key
+                upload_preset
+            }
+        }
+    }
+}
+"""
+
+SET_MERCHANT_LOGO_MUTATION = """
+mutation Common_SetMerchantLogo($input: SetMerchantLogoInput!) {
+    setMerchantLogo(input: $input) {
+        merchant {
+            id
+            name
+            logoUrl
+        }
+    }
+}
+"""
+
+# =============================================================================
+# Recurring Streams — Full Catalog (includes inactive + credit report liabilities)
+# =============================================================================
+
+RECURRING_STREAMS_QUERY = """
+query Common_GetRecurringStreams($includeLiabilities: Boolean) {
+    recurringTransactionStreams(includePending: true, includeLiabilities: $includeLiabilities) {
+        stream {
+            id
+            name
+            frequency
+            amount
+            isApproximate
+            isActive
+            recurringType
+            reviewStatus
+            baseDate
+            dayOfTheMonth
+            merchant {
+                id
+                name
+            }
+            creditReportLiabilityAccount {
+                id
+                status
+                accountType
+                reportedDate
+                account {
+                    id
+                    displayName
+                    currentBalance
+                    displayBalance
+                }
+            }
+        }
+    }
+}
+"""
+
+# =============================================================================
+# Aggregated Recurring Items — What the Monarch UI uses for Upcoming/Complete
+# Includes both merchant-based AND credit report liability items with
+# liabilityStatement (minimumPaymentAmount, paymentsInformation)
+# =============================================================================
+
+AGGREGATED_RECURRING_ITEMS_QUERY = """
+query Common_GetAggregatedRecurringItems($startDate: Date!, $endDate: Date!, $filters: RecurringTransactionFilter) {
+    aggregatedRecurringItems(
+        startDate: $startDate
+        endDate: $endDate
+        groupBy: "status"
+        filters: $filters
+    ) {
+        groups {
+            groupBy {
+                status
+            }
+            results {
+                stream {
+                    id
+                    frequency
+                    isActive
+                    amount
+                    isApproximate
+                    name
+                    logoUrl
+                    merchant {
+                        id
+                        name
+                        logoUrl
+                    }
+                    creditReportLiabilityAccount {
+                        id
+                        liabilityType
+                        account {
+                            id
+                            displayName
+                        }
+                    }
+                }
+                date
+                isPast
+                isLate
+                markedPaidAt
+                isCompleted
+                transactionId
+                amount
+                amountDiff
+                isAmountDifferentThanOriginal
+                creditReportLiabilityStatementId
+                category {
+                    id
+                    name
+                }
+                account {
+                    id
+                    displayName
+                }
+                liabilityStatement {
+                    id
+                    minimumPaymentAmount
+                    paymentsInformation {
+                        status
+                        remainingBalance
+                        transactions {
+                            id
+                            amount
+                            date
+                            category {
+                                id
+                                name
+                            }
+                        }
+                    }
+                }
+            }
+            summary {
+                expense {
+                    total
+                }
+                creditCard {
+                    total
+                }
+                income {
+                    total
+                }
+            }
+        }
+        aggregatedSummary {
+            expense {
+                completed
+                remaining
+                total
+                count
+                pendingAmountCount
+            }
+            creditCard {
+                completed
+                remaining
+                total
+                count
+                pendingAmountCount
+            }
+            income {
+                completed
+                remaining
+                total
+            }
+        }
+    }
+}
+"""
+
+# =============================================================================
+# Recurring Stream Mutations
+# =============================================================================
+
 MARK_AS_NOT_RECURRING_MUTATION = """
 mutation Common_MarkAsNotRecurring($streamId: ID!) {
     markStreamAsNotRecurring(streamId: $streamId) {
