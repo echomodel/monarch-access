@@ -16,6 +16,4 @@ service:
   public: true
   env:
     LOG_LEVEL: INFO
-  auth:
-    enabled: true
-    strategy: bearer
+  auth: bearer
