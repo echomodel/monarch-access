@@ -6,7 +6,6 @@ making it consumable by LLMs like Claude Desktop, Gemini CLI, and other MCP clie
 Uses async functions directly (like ticktick-access) to avoid event loop conflicts.
 """
 
-import contextlib
 import json
 import logging
 import os
@@ -15,9 +14,7 @@ from typing import Any, Optional
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
-from starlette.applications import Starlette
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from ..client import MonarchClient, AuthenticationError, APIError
 from ..queries import (
@@ -787,44 +784,23 @@ def run_server():
 # Usage: uvicorn monarch.mcp.server:mcp_app --host 0.0.0.0 --port 8080
 
 
-class TokenMiddleware(BaseHTTPMiddleware):
-    """Extract bearer token from request and set in context for the handler."""
+class _TokenExtractMiddleware:
+    """ASGI middleware that extracts Bearer token into a contextvar."""
 
-    async def dispatch(self, request, call_next):
-        auth_header = request.headers.get("Authorization")
-        token = None
+    def __init__(self, app: ASGIApp):
+        self.app = app
 
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ", 1)[1]
-        else:
-            token = request.query_params.get("token")
-
-        if not token:
-            return JSONResponse({"error": "Unauthorized"}, status_code=401)
-
-        ctx_token = _request_token.set(token)
-        try:
-            return await call_next(request)
-        finally:
-            _request_token.reset(ctx_token)
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] == "http":
+            headers = dict(scope.get("headers", []))
+            auth = headers.get(b"authorization", b"").decode()
+            if auth.lower().startswith("bearer "):
+                _request_token.set(auth[7:])
+        await self.app(scope, receive, send)
 
 
-@contextlib.asynccontextmanager
-async def _lifespan(app):
-    async with mcp.session_manager.run():
-        yield
-
-
-mcp_app = Starlette(lifespan=_lifespan)
-mcp_app.add_middleware(TokenMiddleware)
-
-
-@mcp_app.route("/health")
-async def health(request):
-    return JSONResponse({"status": "ok"})
-
-
-mcp_app.mount("/", mcp.streamable_http_app())
+_inner_app = mcp.streamable_http_app()
+mcp_app = _TokenExtractMiddleware(_inner_app)
 
 
 if __name__ == "__main__":

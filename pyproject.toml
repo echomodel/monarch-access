@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "monarch-access"
-version = "0.2.0"
+version = "0.2.1"
 description = "Lightweight CLI and Python SDK for accessing Monarch Money financial data"
 readme = "README.md"
 license = "MIT"
