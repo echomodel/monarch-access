@@ -54,13 +54,3 @@ def get_token() -> str | None:
     return None
 
 
-def save_token(token: str) -> Path:
-    """Save the authentication token to the token file.
-
-    Creates the config directory if it doesn't exist.
-    Returns the path where the token was saved.
-    """
-    token_file = get_token_file()
-    token_file.parent.mkdir(parents=True, exist_ok=True)
-    token_file.write_text(token)
-    return token_file

@@ -617,16 +617,6 @@ def _list_categories(output_format: str) -> str:
         return "\n".join(lines)
 
 
-@cli.command("auth")
-@click.argument("token")
-def auth(token: str):
-    """Save authentication token."""
-    from .client import MonarchClient
-    client = MonarchClient(token=token)
-    client.save_token()
-    click.echo(f"Token saved to {client._token_file}")
-
-
 @cli.command("net-worth")
 @click.option("--format", "output_format", type=click.Choice(["text", "json", "csv"]), default="text", help="Output format")
 def net_worth_cmd(output_format: str):
