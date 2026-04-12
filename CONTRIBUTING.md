@@ -22,17 +22,17 @@ monarch-access/
 │   │   ├── base.py       # Protocol interfaces
 │   │   ├── api/          # Real Monarch API provider
 │   │   └── local/        # Local TinyDB provider (for testing)
-│   └── mcp/              # MCP server
-│       └── server.py     # MCP server entry point (monarch-mcp command)
+│   └── mcp/              # MCP server (mcp-app framework)
+│       ├── __init__.py
+│       └── tools.py      # Plain async functions registered by mcp-app
 ├── tests/
 │   ├── conftest.py       # Pytest fixtures
 │   ├── fixtures/
 │   │   └── test_data_seed.json  # Seed data for test generation
 │   ├── test_*.py         # Unit tests (use local provider)
+│   ├── framework/        # mcp-app framework compliance tests
 │   └── integration/      # Integration tests (require live credentials)
 │       └── test_live_reads.py
-
-~/.config/monarch/token   # Auth token (created by monarch auth)
 ```
 
 ## Development
@@ -68,18 +68,12 @@ make integration-test  # Live API tests (requires token)
 
 ## Architecture
 
-- **`config.py`**: Centralized config/token path management with env var overrides
-- **`client.py`**: Auth and generic `_request()` for GraphQL calls
-- **Operation modules** (accounts.py, categories.py, transactions/*.py): API calls and formatting
-- **`cli.py`**: Thin Click wrapper over operation modules
-- **`mcp/server.py`**: MCP server exposing same operations to AI assistants
-
-## Architecture Notes
-
 This project follows a CLI/MCP/SDK layered architecture:
-- **SDK layer** (`monarch/*.py`): Business logic, reusable
+- **SDK layer** (`monarch/*.py`): Business logic, reusable — `client.py` (auth + GraphQL), `config.py` (paths), operation modules (accounts, categories, transactions, recurring)
 - **CLI layer** (`monarch/cli.py`): Thin Click wrapper
-- **MCP layer** (`monarch/mcp/`): Thin MCP wrapper exposing SDK to AI assistants
+- **MCP layer** (`monarch/mcp/tools.py`): Plain async functions registered by [mcp-app](https://github.com/echomodel/mcp-app). `MonarchSDK` in `client.py` bridges mcp-app's `current_user` context to the SDK.
+
+The `App` object in `monarch/__init__.py` wires everything: tools module, profile model, and entry points (`monarch-mcp`, `monarch-admin`).
 
 ## Monarch API Behaviors
 

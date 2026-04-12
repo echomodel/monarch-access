@@ -41,9 +41,10 @@ Total: $3,222.35
 pipx install git+https://github.com/krisrowe/monarch-access.git
 ```
 
-This installs two commands:
+This installs three commands:
 - **`monarch`** - The CLI tool for direct command-line use
 - **`monarch-mcp`** - The MCP server for AI assistant integration (see [MCP Server](#mcp-server-for-ai-assistants))
+- **`monarch-admin`** - User management for MCP server (local and cloud)
 
 ## Requirements
 
@@ -220,16 +221,25 @@ asyncio.run(main())
 
 The `monarch-mcp` command exposes Monarch data via the [Model Context Protocol](https://modelcontextprotocol.io/), enabling AI assistants like Claude and Gemini to access your financial data.
 
+### Setup
+
+Register a local MCP user with your Monarch token:
+
+```bash
+monarch-admin connect local
+monarch-admin users add local --token $MONARCH_SESSION_TOKEN
+```
+
 ### Register with Claude Code
 
 ```bash
-claude mcp add --scope user monarch monarch-mcp
+claude mcp add --scope user monarch -- monarch-mcp stdio --user local
 ```
 
 ### Register with Gemini CLI
 
 ```bash
-gemini mcp add monarch monarch-mcp
+gemini mcp add monarch -- monarch-mcp stdio --user local
 ```
 
 ### Available Tools
@@ -245,28 +255,29 @@ gemini mcp add monarch monarch-mcp
 | `split_transaction` | Split across categories |
 | `create_transaction` | Create manual transaction |
 | `delete_transaction` | Delete a transaction |
+| `list_recurring` | List recurring obligations |
+| `update_recurring` | Update recurring stream settings |
 
 For detailed documentation, see **[MCP-SERVER.md](./MCP-SERVER.md)**.
 
 ## Cloud Deployment (Optional)
 
-This repo is configured for cloud deployment to GCP Cloud Run via [gapp](https://github.com/krisrowe/gapp). This deploys monarch-access as an HTTP MCP server with credential mediation — your Monarch session token stays on the server and is never exposed to clients. Clients authenticate with a personal access token (PAT) instead.
+This repo is configured for cloud deployment to GCP Cloud Run via [gapp](https://github.com/krisrowe/gapp). This deploys monarch-access as an HTTP MCP server with built-in authentication — your Monarch session token stays on the server and is never exposed to clients. Clients authenticate with JWTs issued by `monarch-admin`.
 
 ```bash
 # Install gapp CLI
 pipx install git+https://github.com/krisrowe/gapp.git
 
-# Initialize, attach a GCP project, and deploy
-cd monarch-access
+# Attach a GCP project and deploy
 gapp setup your-gcp-project-id
 gapp deploy
 
-# Register a user and create a PAT
-gapp users register user@example.com "MONARCH_SESSION_TOKEN"
-gapp tokens create user@example.com
+# Register a user with their Monarch session token (see Authentication above)
+monarch-admin connect https://your-service-url
+monarch-admin users add user@example.com --token $MONARCH_SESSION_TOKEN
 ```
 
-See the [gapp repo](https://github.com/krisrowe/gapp) for full documentation on deployment, user management, and client configuration.
+See the [gapp repo](https://github.com/krisrowe/gapp) for deployment documentation.
 
 ## Development
 

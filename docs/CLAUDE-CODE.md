@@ -1,28 +1,28 @@
 # Configuring Monarch MCP Server with Claude Code
 
-This document outlines how to configure the Monarch MCP Server for use with Claude Code (the CLI tool).
-
 ## Prerequisites
 
 - **Monarch Access Installed:** `pipx install git+https://github.com/krisrowe/monarch-access.git`
-- **Monarch Token:** Obtain your token via `monarch auth` - see [README.md](../README.md#authentication)
+- **Monarch Token:** See [README.md](../README.md#authentication)
 - **Claude Code Installed:** [Install Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 
 ## Quick Start
 
-```bash
-claude mcp add --scope user monarch monarch-mcp
-```
+1. Register a local user with your Monarch session token:
+   ```bash
+   monarch-admin connect local
+   monarch-admin users add local --token $MONARCH_SESSION_TOKEN
+   ```
 
-This adds the Monarch MCP server to your user scope so it's available in all projects.
+2. Add the MCP server:
+   ```bash
+   claude mcp add --scope user monarch -- monarch-mcp stdio --user local
+   ```
 
 ## Verifying Configuration
 
 ```bash
-# List all configured MCP servers
 claude mcp list
-
-# You should see monarch listed with "Connected" status
 ```
 
 Within a Claude Code session, use `/mcp` to check server status.
@@ -54,12 +54,10 @@ claude mcp remove --scope user monarch
 
 # Update by removing and re-adding
 claude mcp remove --scope user monarch
-claude mcp add --scope user monarch monarch-mcp
+claude mcp add --scope user monarch -- monarch-mcp stdio --user local
 ```
 
 ## Manual Configuration
-
-For team sharing or fine-grained control, you can manually edit config files.
 
 **User scope** (`~/.claude/settings.local.json`):
 
@@ -67,7 +65,8 @@ For team sharing or fine-grained control, you can manually edit config files.
 {
   "mcpServers": {
     "monarch": {
-      "command": "monarch-mcp"
+      "command": "monarch-mcp",
+      "args": ["stdio", "--user", "local"]
     }
   }
 }
@@ -79,7 +78,8 @@ For team sharing or fine-grained control, you can manually edit config files.
 {
   "mcpServers": {
     "monarch": {
-      "command": "monarch-mcp"
+      "command": "monarch-mcp",
+      "args": ["stdio", "--user", "local"]
     }
   }
 }
@@ -96,45 +96,23 @@ For team sharing or fine-grained control, you can manually edit config files.
 
 2. Test the server directly:
    ```bash
-   monarch-mcp
+   monarch-mcp stdio --user local
    ```
-   (Press Ctrl+C to exit)
 
-3. Verify token is configured:
+3. Verify a local user is registered:
    ```bash
-   monarch accounts
+   monarch-admin connect local
+   monarch-admin users list
    ```
 
 **Token expiration:**
-- Run `monarch auth "NEW_TOKEN"` to refresh
-- No re-configuration needed - the server reads from the token file
+- Monarch tokens expire periodically
+- Update with: `monarch-admin users add local --token "NEW_TOKEN"`
+- No MCP re-registration needed
 
 **Permission errors:**
 - Claude Code prompts for approval on project-scoped servers
 - User-scoped servers don't require approval
-
-## Environment Variable Override
-
-If you need to use a different token than the default file:
-
-```bash
-MONARCH_TOKEN="your_token" claude
-```
-
-Or in manual config:
-
-```json
-{
-  "mcpServers": {
-    "monarch": {
-      "command": "monarch-mcp",
-      "env": {
-        "MONARCH_TOKEN": "your_token_here"
-      }
-    }
-  }
-}
-```
 
 ---
 

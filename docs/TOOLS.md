@@ -1,14 +1,12 @@
-# Monarch MCP Server Tools and Resources
+# Monarch MCP Server Tools
 
-This document describes all tools and resources exposed by the Monarch MCP Server for use by LLMs and MCP clients.
+All tools exposed by the Monarch MCP Server for use by AI assistants and MCP clients.
 
 ## Tools
 
-Tools allow LLMs to query and modify your Monarch Money financial data.
-
 ### `list_accounts`
 
-**Purpose:** Retrieve all financial accounts from Monarch Money.
+List all financial accounts from Monarch Money.
 
 **Input:** None
 
@@ -19,29 +17,20 @@ Tools allow LLMs to query and modify your Monarch Money financial data.
     {
       "id": "account_id_here",
       "displayName": "Account Name",
-      "type": {
-        "display": "Checking"
-      },
+      "type": { "display": "Checking" },
       "currentBalance": 1234.56,
-      "institution": {
-        "name": "Bank Name"
-      }
+      "institution": { "name": "Bank Name" }
     }
   ],
   "count": 5
 }
 ```
 
-**Use Cases:**
-- View all connected accounts and balances
-- Find account IDs for filtering transactions
-- Get an overview of financial accounts
-
 ---
 
 ### `list_categories`
 
-**Purpose:** Retrieve all transaction categories from Monarch Money.
+List all transaction categories from Monarch Money.
 
 **Input:** None
 
@@ -52,31 +41,23 @@ Tools allow LLMs to query and modify your Monarch Money financial data.
     {
       "id": "category_id_here",
       "name": "Groceries",
-      "group": {
-        "name": "Food & Drink",
-        "type": "expense"
-      }
+      "group": { "name": "Food & Drink", "type": "expense" }
     }
   ],
   "count": 50
 }
 ```
 
-**Use Cases:**
-- Discover available categories for filtering
-- Find category IDs for updating transactions
-- Understand category organization
-
 ---
 
 ### `list_transactions`
 
-**Purpose:** Retrieve transactions with optional filters.
+List transactions with optional filters.
 
 **Input:**
-- `limit` (integer, optional): Maximum transactions to return (default: 100, max: 1000)
-- `start_date` (string, optional): Start date filter in YYYY-MM-DD format
-- `end_date` (string, optional): End date filter in YYYY-MM-DD format
+- `limit` (integer, optional): Max transactions to return (default: 100, max: 1000)
+- `start_date` (string, optional): Start date filter (YYYY-MM-DD)
+- `end_date` (string, optional): End date filter (YYYY-MM-DD)
 - `account_ids` (array of strings, optional): Filter by account IDs
 - `category_ids` (array of strings, optional): Filter by category IDs
 - `search` (string, optional): Text search in merchant names and notes
@@ -89,15 +70,9 @@ Tools allow LLMs to query and modify your Monarch Money financial data.
       "id": "transaction_id_here",
       "amount": -127.43,
       "date": "2025-01-15",
-      "merchant": {
-        "name": "Store Name"
-      },
-      "category": {
-        "name": "Shopping"
-      },
-      "account": {
-        "displayName": "Account Name"
-      },
+      "merchant": { "name": "Store Name" },
+      "category": { "name": "Shopping" },
+      "account": { "displayName": "Account Name" },
       "notes": "",
       "needsReview": false
     }
@@ -107,181 +82,129 @@ Tools allow LLMs to query and modify your Monarch Money financial data.
 }
 ```
 
-**Use Cases:**
-- Review recent transactions
-- Find transactions by date range
-- Search for specific merchants
-- Filter by account or category
-
 ---
 
 ### `get_transaction`
 
-**Purpose:** Get details of a single transaction by ID.
+Get details of a single transaction by ID.
 
 **Input:**
-- `transaction_id` (string, required): The ID of the transaction to retrieve
-
-**Output:**
-```json
-{
-  "transaction": {
-    "id": "transaction_id_here",
-    "amount": -127.43,
-    "date": "2025-01-15",
-    "merchant": {
-      "name": "Store Name"
-    },
-    "category": {
-      "name": "Shopping"
-    },
-    "notes": "...",
-    "tags": []
-  },
-  "success": true
-}
-```
-
-**Use Cases:**
-- View full transaction details
-- Check transaction before updating
-- Verify transaction information
+- `transaction_id` (string, required)
 
 ---
 
 ### `update_transaction`
 
-**Purpose:** Update a transaction's category, merchant, notes, or status.
+Update a transaction's category, merchant, notes, or status.
 
 **Input:**
-- `transaction_id` (string, required): The ID of the transaction to update
-- `category_id` (string, optional): New category ID to assign
+- `transaction_id` (string, required)
+- `category_id` (string, optional): New category ID
 - `merchant_name` (string, optional): New merchant name
-- `notes` (string, optional): Notes to add (empty string clears notes)
-- `needs_review` (boolean, optional): Mark as reviewed or needing review
-- `hide_from_reports` (boolean, optional): Hide from reports and budgets
-
-**Output:**
-```json
-{
-  "transaction": {
-    "id": "transaction_id",
-    ...updated fields...
-  },
-  "success": true,
-  "message": "Transaction updated successfully"
-}
-```
-
-**Use Cases:**
-- Recategorize transactions
-- Add notes to transactions
-- Mark transactions as reviewed
-- Hide transactions from reports
+- `notes` (string, optional): Notes (empty string clears)
+- `needs_review` (boolean, optional): Review status
+- `hide_from_reports` (boolean, optional): Hide from reports/budgets
 
 ---
 
 ### `mark_transactions_reviewed`
 
-**Purpose:** Mark multiple transactions as reviewed or needing review.
+Bulk mark transactions as reviewed or needing review.
 
 **Input:**
-- `transaction_ids` (array of strings, required): List of transaction IDs to update
-- `needs_review` (boolean, optional): false = mark as reviewed (default), true = mark as needing review
-
-**Output:**
-```json
-{
-  "success": true,
-  "affectedCount": 5,
-  "message": "Marked 5 transactions as reviewed"
-}
-```
-
-**Use Cases:**
-- Bulk mark transactions as reviewed after checking
-- Reset review status for re-examination
-- Process multiple transactions efficiently
+- `transaction_ids` (array of strings, required)
+- `needs_review` (boolean, optional): false = reviewed (default), true = needing review
 
 ---
 
 ### `split_transaction`
 
-**Purpose:** Split a transaction into multiple parts with different categories.
+Split a transaction into multiple parts with different categories.
 
 **Input:**
-- `transaction_id` (string, required): The ID of the transaction to split
-- `splits` (array of objects, required): Split details
-  - `amount` (number, required): Split amount (negative for expenses)
-  - `categoryId` (string, required): Category ID for the split
-  - `merchantName` (string, optional): Merchant name
-  - `notes` (string, optional): Notes for the split
+- `transaction_id` (string, required)
+- `splits` (array of objects, required): Each with `amount` (number), `categoryId` (string), optional `merchantName`, `notes`
+
+---
+
+### `create_transaction`
+
+Create a new manual transaction.
+
+**Input:**
+- `date` (string, required): YYYY-MM-DD
+- `account_id` (string, required): Must be a manual account
+- `amount` (float, required): Negative for expenses, positive for income
+- `merchant_name` (string, required)
+- `category_id` (string, required)
+- `notes` (string, optional)
+- `update_balance` (boolean, optional): Whether to update account balance
+
+---
+
+### `delete_transaction`
+
+Delete a transaction. Cannot be undone.
+
+**Input:**
+- `transaction_id` (string, required)
+
+---
+
+### `list_recurring`
+
+List tracked recurring obligations (bills, subscriptions, loan payments).
+
+**Input:** None
 
 **Output:**
 ```json
 {
-  "transaction": {
-    "id": "transaction_id",
-    "splitTransactions": [...]
-  },
-  "success": true,
-  "message": "Transaction split into 2 parts"
+  "recurring": [
+    {
+      "stream_id": "...",
+      "merchant": "Netflix",
+      "amount": -15.99,
+      "frequency": "monthly",
+      "category": "Entertainment",
+      "is_active": true,
+      "paid_this_month": true
+    }
+  ],
+  "count": 12
 }
 ```
 
-**Use Cases:**
-- Split purchases across multiple categories
-- Allocate shared expenses
-- Categorize mixed transactions accurately
+---
+
+### `update_recurring`
+
+Update a recurring stream's status, amount, or frequency.
+
+**Input:**
+- `stream_id` (string, required)
+- `status` (string, optional): `active`, `inactive` (reversible), or `removed` (permanent)
+- `amount` (float, optional): New amount
+- `frequency` (string, optional): `monthly`, `biweekly`, `weekly`, etc.
 
 ---
 
-## Resources
+### `mark_as_not_recurring`
 
-Resources provide read-only access to Monarch data.
+**Deprecated** — use `update_recurring` with `status='removed'` instead.
 
-### `monarch://accounts`
+Permanently remove a recurring stream. Removes ALL streams for the merchant.
 
-**Purpose:** Get all financial accounts as a JSON resource.
-
-**URI Pattern:** `monarch://accounts`
-
-**Returns:** JSON string containing all accounts with their IDs, names, types, balances, and metadata.
-
-**Use Cases:**
-- Read account information without using tools
-- Access account data as context for LLMs
+**Input:**
+- `stream_id` (string, required)
 
 ---
-
-### `monarch://categories`
-
-**Purpose:** Get all transaction categories as a JSON resource.
-
-**URI Pattern:** `monarch://categories`
-
-**Returns:** JSON string containing all categories with their IDs, names, and group information.
-
-**Use Cases:**
-- Read category information without using tools
-- Access category data as context for LLMs
-
----
-
-## Discovery
-
-The MCP protocol provides automatic discovery of tools and resources. When an MCP client connects:
-
-1. **Discovers all tools** - Gets names, descriptions, input schemas, and output schemas
-2. **Discovers all resources** - Gets URI patterns and descriptions
-3. **Validates inputs** - Ensures tool calls match the defined schemas
-4. **Provides documentation** - Makes tool descriptions available to LLMs
 
 ## Example Usage Flow
 
-1. **List accounts** to see available accounts:
+1. **List accounts** to discover IDs and balances:
    ```
-   list_accounts() → Get account IDs and balances
+   list_accounts()
    ```
 
 2. **List transactions** for a date range:
@@ -304,5 +227,4 @@ The MCP protocol provides automatic discovery of tools and resources. When an MC
 - Use `list_accounts` and `list_categories` first to discover IDs
 - Filter transactions by date range to avoid large result sets
 - Use the `search` parameter for finding specific transactions
-- Set `needs_review=false` when done reviewing transactions
 - Use `split_transaction` for purchases that span multiple categories

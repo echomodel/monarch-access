@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "monarch-access"
-version = "0.2.1"
+version = "0.3.0"
 description = "Lightweight CLI and Python SDK for accessing Monarch Money financial data"
 readme = "README.md"
 license = "MIT"
@@ -13,7 +13,7 @@ dependencies = [
     "aiohttp>=3.8.0",
     "click>=8.0.0",
     "tinydb>=4.8.0",
-    "mcp>=1.0.0",
+    "mcp-app @ git+https://github.com/echomodel/mcp-app.git",
     "pydantic>=2.0.0",
 ]
 
@@ -28,7 +28,11 @@ http = [
 
 [project.scripts]
 monarch = "monarch.cli:cli"
-monarch-mcp = "monarch.mcp.server:run_server"
+monarch-mcp = "monarch:app.mcp_cli"
+monarch-admin = "monarch:app.admin_cli"
+
+[project.entry-points."mcp_app.apps"]
+monarch = "monarch:app"
 
 [project.urls]
 Homepage = "https://github.com/krisrowe/monarch-access"

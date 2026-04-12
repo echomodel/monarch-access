@@ -1,5 +1,5 @@
-"""Monarch Money MCP Server package."""
+"""MCP server for Monarch Money."""
 
-from .server import run_server
+from . import tools
 
-__all__ = ["run_server"]
+__all__ = ["tools"]

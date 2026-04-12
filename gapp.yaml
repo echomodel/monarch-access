@@ -10,9 +10,13 @@
 # See README.md for standard installation and usage.
 
 service:
-  entrypoint: monarch.mcp.server:mcp_app
-  mcp_path: /mcp
-  runtime: v0.4.0
-  env:
-    LOG_LEVEL: INFO
-  auth: bearer
+  cmd: monarch-mcp serve
+public: true
+env:
+  - name: SIGNING_KEY
+    secret:
+      generate: true
+  - name: APP_USERS_PATH
+    value: "{{SOLUTION_DATA_PATH}}/users"
+  - name: LOG_LEVEL
+    value: INFO

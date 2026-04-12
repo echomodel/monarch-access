@@ -15,26 +15,29 @@ The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standa
 
 ### Prerequisites
 
-1. **Install the CLI** (includes MCP server):
+1. **Install** (includes CLI, MCP server, and admin tools):
    ```bash
    pipx install git+https://github.com/krisrowe/monarch-access.git
    ```
 
-2. **Authenticate** (see [README.md](./README.md#authentication)):
+2. **Get your Monarch token** (see [README.md](./README.md#authentication))
+
+3. **Register a local user** for MCP:
    ```bash
-   monarch auth "YOUR_TOKEN"
+   monarch-admin connect local
+   monarch-admin users add local --token $MONARCH_SESSION_TOKEN
    ```
 
 ### Register with Claude Code
 
 ```bash
-claude mcp add --scope user monarch monarch-mcp
+claude mcp add --scope user monarch -- monarch-mcp stdio --user local
 ```
 
 ### Register with Gemini CLI
 
 ```bash
-gemini mcp add monarch monarch-mcp
+gemini mcp add monarch -- monarch-mcp stdio --user local
 ```
 
 ### Verify
@@ -60,24 +63,30 @@ gemini mcp list
 | `split_transaction` | Split a transaction across multiple categories |
 | `create_transaction` | Create a manual transaction |
 | `delete_transaction` | Delete a transaction |
-
-## Resources
-
-| Resource | Description |
-|----------|-------------|
-| `monarch://accounts` | All accounts as JSON |
-| `monarch://categories` | All categories as JSON |
+| `list_recurring` | List tracked recurring obligations (bills, subscriptions, loans) |
+| `update_recurring` | Update a recurring stream's status, amount, or frequency |
+| `mark_as_not_recurring` | Permanently remove a recurring stream (deprecated — use `update_recurring`) |
 
 ## Configuration
 
-The MCP server uses the same token as the CLI:
+### Local (stdio)
 
-| Source | Location |
-|--------|----------|
-| Token file | `~/.config/monarch/token` |
-| Environment variable | `MONARCH_TOKEN` (takes precedence) |
+The MCP server uses mcp-app's user store. Register a local user with your Monarch token:
 
-Override config directory with `MONARCH_CONFIG_DIR` environment variable.
+```bash
+monarch-admin connect local
+monarch-admin users add local --token $MONARCH_SESSION_TOKEN
+```
+
+To update the token later:
+```bash
+monarch-admin connect local
+monarch-admin users add local --token "NEW_TOKEN"
+```
+
+### Cloud (HTTP)
+
+See [Cloud Deployment](./README.md#cloud-deployment-optional) for deploying as an HTTP MCP server with multi-user support.
 
 ## Troubleshooting
 
@@ -94,35 +103,22 @@ Token may have expired. Get a new one:
 
 Test the server directly:
 ```bash
-monarch-mcp
+monarch-mcp stdio --user local
 ```
 
-If it exits with errors, check that dependencies are installed:
-```bash
-pipx reinstall monarch-access
-```
-
-## HTTP Transport (Advanced)
-
-For persistent server or multi-client setups:
-
-```bash
-pip install uvicorn
-uvicorn monarch.mcp.server:mcp_app --host 127.0.0.1 --port 8000
-```
-
-Then configure your client to connect to `http://localhost:8000/mcp`.
+If it exits with errors, check that:
+1. Dependencies are installed: `pipx reinstall monarch-access`
+2. A local user is registered: `monarch-admin connect local && monarch-admin users add local --token $MONARCH_SESSION_TOKEN`
 
 ## Security
 
 - **Token storage**: Never commit tokens to version control
-- **Local only**: The MCP server runs locally under your user account
-- **Token expiration**: Monarch tokens expire periodically; regenerate as needed
+- **Local stdio**: Runs locally under your user account; token stored in mcp-app's local user store
+- **Cloud HTTP**: Tokens stored server-side; clients authenticate with JWTs issued by `monarch-admin`
+- **Token expiration**: Monarch tokens expire periodically; update with `monarch-admin users add`
 
 ## Related Documentation
 
-- [docs/CLAUDE-CODE.md](./docs/CLAUDE-CODE.md) - Claude Code configuration details
-- [docs/GEMINI-CLI.md](./docs/GEMINI-CLI.md) - Gemini CLI configuration details
 - [README.md](./README.md) - CLI usage and authentication
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - Development setup
 - [MCP Specification](https://modelcontextprotocol.io/) - Official MCP docs

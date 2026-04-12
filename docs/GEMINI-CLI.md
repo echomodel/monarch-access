@@ -1,36 +1,32 @@
 # Configuring Monarch MCP Server with Gemini CLI
 
-This document outlines how to configure the Monarch MCP Server for use with Gemini CLI and Gemini Code Assist in VS Code.
-
-**Note:** IntelliJ's Gemini Code Assist plugin does not currently support MCP servers.
-
 ## Prerequisites
 
 - **Monarch Access Installed:** `pipx install git+https://github.com/krisrowe/monarch-access.git`
-- **Monarch Token:** Obtain your token via `monarch auth` - see [README.md](../README.md#authentication)
+- **Monarch Token:** See [README.md](../README.md#authentication)
 - **Gemini CLI or Gemini Code Assist Installed:**
   - For Gemini CLI: [Install Gemini CLI](https://google-gemini.github.io/gemini-cli/)
   - For Gemini Code Assist: Install from VS Code marketplace
 
+**Note:** IntelliJ's Gemini Code Assist plugin does not currently support MCP servers.
+
 ## Quick Start
 
-```bash
-gemini mcp add monarch monarch-mcp --scope user
-```
+1. Register a local user with your Monarch session token:
+   ```bash
+   monarch-admin connect local
+   monarch-admin users add local --token $MONARCH_SESSION_TOKEN
+   ```
 
-This adds the Monarch MCP server to your user scope so it's available in all projects.
+2. Add the MCP server:
+   ```bash
+   gemini mcp add monarch -- monarch-mcp stdio --user local
+   ```
 
 ## Verifying Configuration
 
 ```bash
 gemini mcp list
-```
-
-Expected output:
-```
-Configured MCP servers:
-
-✓ monarch: monarch-mcp (stdio) - Connected
 ```
 
 ## Configuration Scope
@@ -72,18 +68,19 @@ gemini mcp remove monarch --scope user
 
 # Update by removing and re-adding
 gemini mcp remove monarch --scope user
-gemini mcp add monarch monarch-mcp --scope user
+gemini mcp add monarch -- monarch-mcp stdio --user local
 ```
 
 ## Manual Configuration
 
-For fine-grained control, edit `~/.gemini/settings.json` directly:
+Edit `~/.gemini/settings.json`:
 
 ```json
 {
   "mcpServers": {
     "monarch": {
-      "command": "monarch-mcp"
+      "command": "monarch-mcp",
+      "args": ["stdio", "--user", "local"]
     }
   }
 }
@@ -100,36 +97,19 @@ For fine-grained control, edit `~/.gemini/settings.json` directly:
 
 2. Test the server directly:
    ```bash
-   monarch-mcp
+   monarch-mcp stdio --user local
    ```
-   (Press Ctrl+C to exit)
 
-3. Verify token is configured:
+3. Verify a local user is registered:
    ```bash
-   monarch accounts
+   monarch-admin connect local
+   monarch-admin users list
    ```
 
 **Token expiration:**
-- Monarch tokens typically last several months
-- Run `monarch auth "NEW_TOKEN"` to refresh
-- No re-registration needed - the server reads from the token file
-
-## Environment Variable Override
-
-If you need to use a different token:
-
-```json
-{
-  "mcpServers": {
-    "monarch": {
-      "command": "monarch-mcp",
-      "env": {
-        "MONARCH_TOKEN": "your_token_here"
-      }
-    }
-  }
-}
-```
+- Monarch tokens expire periodically
+- Update with: `monarch-admin users add local --token "NEW_TOKEN"`
+- No MCP re-registration needed
 
 ## VS Code Notes
 
