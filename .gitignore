@@ -18,7 +18,8 @@ dist/
 .idea/
 .vscode/
 .claude/
-.gemini/
+.gemini/*
+!.gemini/settings.json
 
 # Reference repos (not part of this project)
 refs/
@@ -27,4 +28,4 @@ refs/
 *.log
 
 # Generated test data (derived from test_data_seed.json)
-tests/fixtures/test_data.json
+tests/unit/sdk/fixtures/test_data.json

@@ -26,10 +26,10 @@ monarch-access/
 │       ├── __init__.py
 │       └── tools.py      # Plain async functions registered by mcp-app
 ├── tests/
-│   ├── conftest.py       # Pytest fixtures
-│   ├── fixtures/
-│   │   └── test_data_seed.json  # Seed data for test generation
-│   ├── test_*.py         # Unit tests (use local provider)
+│   ├── unit/sdk/         # SDK unit tests (use local provider)
+│   │   ├── conftest.py
+│   │   ├── fixtures/
+│   │   └── test_*.py
 │   ├── framework/        # mcp-app framework compliance tests
 │   └── integration/      # Integration tests (require live credentials)
 │       └── test_live_reads.py

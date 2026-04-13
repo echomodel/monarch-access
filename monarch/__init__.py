@@ -13,6 +13,7 @@ __version__ = "0.3.0"
 from pydantic import BaseModel
 from mcp_app import App
 from .mcp import tools
+import monarch as _self
 
 
 class Profile(BaseModel):
@@ -23,6 +24,7 @@ class Profile(BaseModel):
 app = App(
     name="monarch",
     tools_module=tools,
+    sdk_package=_self,
     profile_model=Profile,
     profile_expand=True,
 )

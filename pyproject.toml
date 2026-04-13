@@ -42,7 +42,7 @@ Repository = "https://github.com/krisrowe/monarch-access"
 include = ["monarch*"]
 
 [tool.pytest.ini_options]
-# Only run unit tests by default. Integration tests require live credentials.
+# Only run unit and framework tests by default. Integration tests require live credentials.
 # Run integration tests with: pytest tests/integration/ -v
 testpaths = ["tests"]
 addopts = "--ignore=tests/integration"
