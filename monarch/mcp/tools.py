@@ -14,14 +14,18 @@ logger = logging.getLogger(__name__)
 sdk = MonarchSDK
 
 
-async def list_accounts() -> dict[str, Any]:
+async def list_accounts(include_closed: bool = False) -> dict[str, Any]:
     """List all financial accounts from Monarch Money.
 
     Returns account IDs, names, types, balances, and institution names.
     Use account IDs with list_transactions to filter by account.
+    Closed/deactivated accounts are excluded by default.
+
+    Args:
+        include_closed: Include closed/deactivated accounts (default: false).
     """
     try:
-        return await sdk.get_accounts()
+        return await sdk.get_accounts(include_closed=include_closed)
     except AuthenticationError as e:
         return {"error": str(e), "accounts": [], "count": 0}
     except Exception as e:

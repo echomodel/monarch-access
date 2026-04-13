@@ -88,10 +88,10 @@ class MonarchSDK:
         return MonarchClient(token=user.profile.token)
 
     @classmethod
-    async def get_accounts(cls) -> dict:
+    async def get_accounts(cls, include_closed: bool = False) -> dict:
         from . import accounts
         client = cls._client()
-        accts = await accounts.get_accounts(client)
+        accts = await accounts.get_accounts(client, include_closed=include_closed)
         return {"accounts": accts, "count": len(accts)}
 
     @classmethod

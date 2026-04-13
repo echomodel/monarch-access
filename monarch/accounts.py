@@ -6,16 +6,24 @@ import io
 from .queries import ACCOUNTS_QUERY
 
 
-async def get_accounts(client) -> list[dict]:
-    """Get all accounts."""
+def is_closed(account: dict) -> bool:
+    """Check if an account is closed/deactivated."""
+    return bool(account.get("deactivatedAt")) or bool(account.get("isHidden"))
+
+
+async def get_accounts(client, include_closed: bool = False) -> list[dict]:
+    """Get all accounts, excluding closed/deactivated by default."""
     data = await client._request(ACCOUNTS_QUERY)
-    return data.get("accounts", [])
+    accounts = data.get("accounts", [])
+    if not include_closed:
+        accounts = [a for a in accounts if not is_closed(a)]
+    return accounts
 
 
 def format_csv(accounts: list[dict]) -> str:
     """Format accounts as CSV."""
     output = io.StringIO()
-    fieldnames = ["id", "name", "type", "balance", "institution", "mask"]
+    fieldnames = ["id", "name", "type", "balance", "institution", "mask", "status"]
     writer = csv.DictWriter(output, fieldnames=fieldnames)
     writer.writeheader()
     for a in accounts:
@@ -26,6 +34,7 @@ def format_csv(accounts: list[dict]) -> str:
             "balance": a.get("currentBalance", 0),
             "institution": (a.get("institution") or {}).get("name", ""),
             "mask": a.get("mask", ""),
+            "status": "closed" if is_closed(a) else "active",
         })
     return output.getvalue()
 
@@ -80,9 +89,13 @@ def format_text(accounts: list[dict]) -> str:
         rows.append((f"[{acc_type}]", "", fmt_money(type_total)))
         for acc in sorted(accts, key=lambda x: -abs(x.get("currentBalance", 0) or 0)):
             name = acc.get("displayName", "Unknown")
+            if is_closed(acc):
+                name = f"  {name} [CLOSED]"
+            else:
+                name = f"  {name}"
             inst = (acc.get("institution") or {}).get("name", "")
             balance = acc.get("currentBalance", 0) or 0
-            rows.append((f"  {name}", inst[:18], fmt_money(balance)))
+            rows.append((name, inst[:18], fmt_money(balance)))
 
     lines.extend(make_table(rows))
 

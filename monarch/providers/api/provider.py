@@ -183,9 +183,13 @@ class APIProvider:
 
         return result
 
-    def get_accounts(self) -> list[dict]:
-        """Get all accounts."""
-        return self._run(self._get_accounts())
+    def get_accounts(self, include_closed: bool = False) -> list[dict]:
+        """Get all accounts. Excludes closed/deactivated by default."""
+        from ...accounts import is_closed
+        accounts = self._run(self._get_accounts())
+        if not include_closed:
+            accounts = [a for a in accounts if not is_closed(a)]
+        return accounts
 
     async def _get_accounts(self) -> list[dict]:
         data = await self._client._request(ACCOUNTS_QUERY)

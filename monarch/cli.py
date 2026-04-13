@@ -548,10 +548,11 @@ def _list_recurring(output_format: str) -> str:
 
 @cli.command("accounts")
 @click.option("--format", "output_format", type=click.Choice(["text", "json", "csv"]), default="text", help="Output format")
-def list_accounts(output_format: str):
+@click.option("--include-closed", is_flag=True, help="Include closed/deactivated accounts")
+def list_accounts(output_format: str, include_closed: bool):
     """List all accounts."""
     try:
-        result = _list_accounts(output_format)
+        result = _list_accounts(output_format, include_closed)
         click.echo(result)
     except AuthenticationError as e:
         click.echo(f"Authentication error: {e}", err=True)
@@ -561,10 +562,10 @@ def list_accounts(output_format: str):
         sys.exit(1)
 
 
-def _list_accounts(output_format: str) -> str:
+def _list_accounts(output_format: str, include_closed: bool = False) -> str:
     """Implementation of list accounts."""
     provider = get_provider()
-    accts = provider.get_accounts()
+    accts = provider.get_accounts(include_closed=include_closed)
 
     if output_format == "json":
         return json.dumps(accts, indent=2, default=str)
@@ -635,7 +636,7 @@ def net_worth_cmd(output_format: str):
 def _net_worth(output_format: str) -> str:
     """Implementation of net worth."""
     provider = get_provider()
-    accts = provider.get_accounts()
+    accts = provider.get_accounts(include_closed=False)
     report = net_worth.build_report(accts)
 
     if output_format == "json":

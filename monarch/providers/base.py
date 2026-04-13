@@ -59,8 +59,8 @@ class TransactionsProvider(Protocol):
 class AccountsProvider(Protocol):
     """Interface for account operations."""
 
-    def get_accounts(self) -> list[dict]:
-        """Get all accounts."""
+    def get_accounts(self, include_closed: bool = False) -> list[dict]:
+        """Get all accounts. Excludes closed/deactivated by default."""
         ...
 
 

@@ -113,9 +113,13 @@ class LocalProvider:
         # Return updated transaction
         return self._transactions.search(Txn.id == transaction_id)[0]
 
-    def get_accounts(self) -> list[dict]:
-        """Get all accounts."""
-        return self._accounts.all()
+    def get_accounts(self, include_closed: bool = False) -> list[dict]:
+        """Get all accounts. Excludes closed/deactivated by default."""
+        from ...accounts import is_closed
+        accounts = self._accounts.all()
+        if not include_closed:
+            accounts = [a for a in accounts if not is_closed(a)]
+        return accounts
 
     def get_categories(self) -> list[dict]:
         """Get all transaction categories."""
