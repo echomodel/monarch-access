@@ -12,6 +12,7 @@
 service:
   cmd: monarch-mcp serve
 public: true
+domain: mcp.monarch.echomodel.ai
 env:
   - name: SIGNING_KEY
     secret:
