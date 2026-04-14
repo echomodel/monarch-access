@@ -62,14 +62,15 @@ Monarch doesn't have a public API, so you need to grab your session token from t
    JSON.parse(JSON.parse(localStorage.getItem("persist:root")).user).token
    ```
 4. Copy the token string
-5. Save it:
+5. Register it:
    ```bash
-   monarch auth "YOUR_TOKEN_HERE"
+   monarch-admin connect local
+   monarch-admin users add local --token $MONARCH_SESSION_TOKEN
    ```
 
-The token is saved to `~/.config/monarch/token` and typically lasts several months. You'll need to repeat this when it expires.
+The token is stored in the local user store and used by both the CLI and MCP server. Tokens typically last several months — repeat these steps when yours expires.
 
-**Environment variable override:** You can also set `MONARCH_TOKEN` environment variable, which takes precedence over the token file.
+**Environment variable override:** You can set `MONARCH_TOKEN` to override the stored token.
 
 ## CLI Usage
 

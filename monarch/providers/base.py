@@ -16,6 +16,7 @@ class TransactionsProvider(Protocol):
         account_ids: Optional[list[str]] = None,
         category_ids: Optional[list[str]] = None,
         search: Optional[str] = None,
+        is_expense: Optional[bool] = None,
     ) -> dict:
         """Get transactions with optional filters.
 

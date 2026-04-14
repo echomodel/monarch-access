@@ -27,6 +27,7 @@ class LocalProvider:
         account_ids: Optional[list[str]] = None,
         category_ids: Optional[list[str]] = None,
         search: Optional[str] = None,
+        is_expense: Optional[bool] = None,
     ) -> dict:
         """Get transactions with optional filters."""
         all_txns = self._transactions.all()
@@ -42,6 +43,11 @@ class LocalProvider:
             filtered = [t for t in filtered if t.get("account", {}).get("id") in account_ids]
         if category_ids:
             filtered = [t for t in filtered if t.get("category", {}).get("id") in category_ids]
+        if is_expense is not None:
+            if is_expense:
+                filtered = [t for t in filtered if (t.get("amount") or 0) < 0]
+            else:
+                filtered = [t for t in filtered if (t.get("amount") or 0) > 0]
         if search:
             search_lower = search.lower()
             filtered = [

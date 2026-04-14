@@ -1,11 +1,8 @@
 """Monarch Money API client."""
 
-from pathlib import Path
 from typing import Optional
 
 import aiohttp
-
-from .config import get_token, get_token_file
 
 GRAPHQL_URL = "https://api.monarch.com/graphql"
 
@@ -37,12 +34,8 @@ class APIError(MonarchClientError):
 class MonarchClient:
     """Lightweight client for Monarch Money API."""
 
-    def __init__(
-        self,
-        token: Optional[str] = None,
-    ):
-        self._token = token or get_token()
-        self._token_file = get_token_file()
+    def __init__(self, token: str):
+        self._token = token
 
     @property
     def is_authenticated(self) -> bool:
@@ -51,10 +44,9 @@ class MonarchClient:
     async def _request(self, query: str, variables: Optional[dict] = None) -> dict:
         if not self._token:
             raise AuthenticationError(
-                "Not authenticated. Get token from browser:\n"
-                "1. Login to https://app.monarch.com/\n"
-                "2. DevTools (F12) -> Console\n"
-                "3. Run: JSON.parse(JSON.parse(localStorage.getItem('persist:root')).user).token"
+                "No Monarch token configured. Set up auth with:\n"
+                "  monarch-admin connect local\n"
+                "  monarch-admin users add local --token $MONARCH_SESSION_TOKEN"
             )
 
         headers = {**HEADERS, "Authorization": f"Token {self._token}"}
@@ -255,3 +247,23 @@ class MonarchSDK:
         client = cls._client()
         result = await mark_as_not_recurring(client, stream_id)
         return {"success": True, "result": result}
+
+    @classmethod
+    async def get_rules(cls) -> dict:
+        from .rules import get_rules, format_rule
+        client = cls._client()
+        rules = await get_rules(client)
+        formatted = [format_rule(r) for r in rules]
+        return {"rules": formatted, "count": len(formatted)}
+
+    @classmethod
+    async def create_rule(cls, **kwargs) -> dict:
+        from .rules import create_rule
+        client = cls._client()
+        return await create_rule(client, **kwargs)
+
+    @classmethod
+    async def delete_rule(cls, rule_id: str) -> dict:
+        from .rules import delete_rule
+        client = cls._client()
+        return await delete_rule(client, rule_id)

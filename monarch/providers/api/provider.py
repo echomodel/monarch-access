@@ -1,9 +1,10 @@
 """Monarch API provider implementation."""
 
 import asyncio
+import os
 from typing import Any, Optional
 
-from ...client import MonarchClient, APIError
+from ...client import MonarchClient, APIError, AuthenticationError
 from ...queries import (
     ACCOUNTS_QUERY,
     BULK_UPDATE_TRANSACTIONS_MUTATION,
@@ -17,11 +18,38 @@ from ...queries import (
 )
 
 
+def _load_token() -> str:
+    """Load the Monarch session token.
+
+    Priority:
+    1. MONARCH_TOKEN environment variable
+    2. mcp-app local user store ("local" user)
+    """
+    env_token = os.environ.get("MONARCH_TOKEN")
+    if env_token:
+        return env_token.strip()
+
+    from mcp_app import FileSystemUserDataStore
+    store = FileSystemUserDataStore("monarch")
+    user_data = store.load("local", "user")
+    if user_data and isinstance(user_data, dict):
+        profile = user_data.get("profile") or {}
+        token = profile.get("token")
+        if token:
+            return token
+
+    raise AuthenticationError(
+        "No Monarch token configured. Set up auth with:\n"
+        "  monarch-admin connect local\n"
+        "  monarch-admin users add local --token $MONARCH_SESSION_TOKEN"
+    )
+
+
 class APIProvider:
     """Provider that connects to the Monarch Money API."""
 
     def __init__(self, client: Optional[MonarchClient] = None):
-        self._client = client or MonarchClient()
+        self._client = client or MonarchClient(token=_load_token())
 
     def _run(self, coro):
         """Run async coroutine synchronously."""
@@ -36,10 +64,11 @@ class APIProvider:
         account_ids: Optional[list[str]] = None,
         category_ids: Optional[list[str]] = None,
         search: Optional[str] = None,
+        is_expense: Optional[bool] = None,
     ) -> dict:
         """Get transactions with optional filters."""
         return self._run(self._get_transactions(
-            limit, offset, start_date, end_date, account_ids, category_ids, search
+            limit, offset, start_date, end_date, account_ids, category_ids, search, is_expense
         ))
 
     async def _get_transactions(
@@ -51,6 +80,7 @@ class APIProvider:
         account_ids: Optional[list[str]],
         category_ids: Optional[list[str]],
         search: Optional[str],
+        is_expense: Optional[bool] = None,
     ) -> dict:
         variables: dict[str, Any] = {
             "limit": limit,
@@ -69,7 +99,17 @@ class APIProvider:
             variables["filters"]["endDate"] = end_date
 
         data = await self._client._request(TRANSACTIONS_QUERY, variables)
-        return data.get("allTransactions", {"totalCount": 0, "results": []})
+        result = data.get("allTransactions", {"totalCount": 0, "results": []})
+
+        if is_expense is not None:
+            results = result.get("results", [])
+            if is_expense:
+                results = [t for t in results if (t.get("amount") or 0) < 0]
+            else:
+                results = [t for t in results if (t.get("amount") or 0) > 0]
+            result = {"totalCount": result.get("totalCount", 0), "results": results}
+
+        return result
 
     def get_transaction(self, transaction_id: str) -> Optional[dict]:
         """Get a single transaction by ID."""

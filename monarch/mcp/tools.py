@@ -55,10 +55,11 @@ async def list_transactions(
     account_ids: Optional[list[str]] = None,
     category_ids: Optional[list[str]] = None,
     search: Optional[str] = None,
+    is_expense: Optional[bool] = None,
 ) -> dict[str, Any]:
     """List transactions from Monarch Money with optional filters.
 
-    Filter by date range, accounts, categories, or search text.
+    Filter by date range, accounts, categories, search text, or transaction direction.
     Returns transaction details including amounts, merchants, categories, and notes.
 
     Args:
@@ -68,6 +69,7 @@ async def list_transactions(
         account_ids: List of account IDs to filter by. Get IDs from list_accounts.
         category_ids: List of category IDs to filter by. Get IDs from list_categories.
         search: Search text to filter by merchant name, notes, or description.
+        is_expense: Filter by amount sign, matching Monarch's rule terminology. True = negative amounts (charges, withdrawals, payments made). False = positive amounts (deposits, refunds, payments received). A refund on an expense category has a positive amount, so is_expense=false. Omit for all transactions.
     """
     try:
         return await sdk.get_transactions(
@@ -77,6 +79,7 @@ async def list_transactions(
             account_ids=account_ids,
             category_ids=category_ids,
             search=search,
+            is_expense=is_expense,
         )
     except AuthenticationError as e:
         return {"error": str(e), "transactions": [], "count": 0, "totalCount": 0}
@@ -307,4 +310,85 @@ async def mark_as_not_recurring(
         return {"error": str(e), "success": False}
     except Exception as e:
         logger.error(f"Error marking stream as not recurring: {e}")
+        return {"error": str(e), "success": False}
+
+
+async def list_rules() -> dict[str, Any]:
+    """List all transaction auto-categorization rules from Monarch Money.
+
+    Returns rules with their criteria (merchant match, amount, account, category)
+    and actions (set category, set merchant, add tags, etc.).
+    Rules are applied in order to new transactions.
+    """
+    try:
+        return await sdk.get_rules()
+    except AuthenticationError as e:
+        return {"error": str(e), "rules": [], "count": 0}
+    except Exception as e:
+        logger.error(f"Error listing rules: {e}")
+        return {"error": str(e), "rules": [], "count": 0}
+
+
+async def create_rule(
+    set_category_action: Optional[str] = None,
+    set_merchant_action: Optional[str] = None,
+    merchant_criteria: Optional[list[dict]] = None,
+    original_statement_criteria: Optional[list[dict]] = None,
+    amount_criteria: Optional[dict] = None,
+    account_ids: Optional[list[str]] = None,
+    category_ids: Optional[list[str]] = None,
+    add_tags_action: Optional[list[str]] = None,
+    apply_to_existing: bool = False,
+) -> dict[str, Any]:
+    """Create a new transaction auto-categorization rule.
+
+    Rules match transactions by criteria and apply actions. At least one
+    criterion and one action are required.
+
+    Args:
+        set_category_action: Category ID to assign to matching transactions.
+        set_merchant_action: Merchant name to set (string, not ID — Monarch resolves it).
+        merchant_criteria: List of merchant match conditions. Each: {"operator": "contains"|"eq", "value": "search term"}.
+        original_statement_criteria: List of original statement match conditions. Each: {"operator": "contains"|"eq", "value": "search term"}.
+        amount_criteria: Amount filter. Example: {"operator": "gt", "is_expense": true, "value": 5.0}. Operators: "gt", "lt", "eq". For ranges: {"operator": "between", "is_expense": true, "range": {"lower": 10, "upper": 50}}.
+        account_ids: Limit rule to specific account IDs.
+        category_ids: Limit rule to specific source category IDs (match transactions already in these categories).
+        add_tags_action: List of tag IDs to add to matching transactions.
+        apply_to_existing: If true, retroactively apply to existing matching transactions.
+    """
+    try:
+        return await sdk.create_rule(
+            merchant_criteria=merchant_criteria,
+            original_statement_criteria=original_statement_criteria,
+            amount_criteria=amount_criteria,
+            account_ids=account_ids,
+            category_ids=category_ids,
+            set_merchant_action=set_merchant_action,
+            set_category_action=set_category_action,
+            add_tags_action=add_tags_action,
+            apply_to_existing=apply_to_existing,
+        )
+    except (AuthenticationError, APIError) as e:
+        return {"error": str(e), "success": False}
+    except Exception as e:
+        logger.error(f"Error creating rule: {e}")
+        return {"error": str(e), "success": False}
+
+
+async def delete_rule(
+    rule_id: str,
+) -> dict[str, Any]:
+    """Delete a transaction rule by ID.
+
+    Get rule IDs from list_rules. This cannot be undone.
+
+    Args:
+        rule_id: The ID of the rule to delete.
+    """
+    try:
+        return await sdk.delete_rule(rule_id)
+    except (AuthenticationError, APIError) as e:
+        return {"error": str(e), "success": False}
+    except Exception as e:
+        logger.error(f"Error deleting rule: {e}")
         return {"error": str(e), "success": False}

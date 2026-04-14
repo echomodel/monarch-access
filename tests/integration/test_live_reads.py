@@ -7,23 +7,37 @@ To run:
     pytest tests/integration/
 """
 
+import os
+
 import pytest
 
-from monarch.config import get_token
 from monarch.client import MonarchClient
+
+
+def _has_token() -> bool:
+    """Check if a Monarch token is available (env var or mcp-app store)."""
+    if os.environ.get("MONARCH_TOKEN"):
+        return True
+    try:
+        from monarch.providers.api.provider import _load_token
+        _load_token()
+        return True
+    except Exception:
+        return False
 
 
 # Skip all tests in this module if no token is available
 pytestmark = pytest.mark.skipif(
-    get_token() is None,
-    reason="No Monarch token configured (set MONARCH_TOKEN or create ~/.config/monarch/token)"
+    not _has_token(),
+    reason="No Monarch token configured (set MONARCH_TOKEN or run: monarch-admin connect local && monarch-admin users add local --token TOKEN)"
 )
 
 
 @pytest.fixture
 def client():
     """Create a MonarchClient for live API calls."""
-    return MonarchClient()
+    from monarch.providers.api.provider import _load_token
+    return MonarchClient(token=_load_token())
 
 
 class TestLiveReads:

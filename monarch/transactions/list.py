@@ -16,8 +16,18 @@ async def get_transactions(
     account_ids: Optional[list[str]] = None,
     category_ids: Optional[list[str]] = None,
     search: Optional[str] = None,
+    is_expense: Optional[bool] = None,
 ) -> dict:
-    """Get transactions with optional filters."""
+    """Get transactions with optional filters.
+
+    Args:
+        is_expense: Filter by amount sign, matching Monarch's rule terminology.
+            True = negative amounts (charges, withdrawals, payments made).
+            False = positive amounts (deposits, refunds, payments received).
+            None = all transactions.
+            Note: this filters on amount sign, not category type. A refund
+            on an expense category has a positive amount, so is_expense=False.
+    """
     variables: dict[str, Any] = {
         "limit": limit,
         "offset": offset,
@@ -37,7 +47,20 @@ async def get_transactions(
         variables["filters"]["endDate"] = end_date
 
     data = await client._request(TRANSACTIONS_QUERY, variables)
-    return data.get("allTransactions", {"totalCount": 0, "results": []})
+    result = data.get("allTransactions", {"totalCount": 0, "results": []})
+
+    if is_expense is not None:
+        results = result.get("results", [])
+        if is_expense:
+            results = [t for t in results if (t.get("amount") or 0) < 0]
+        else:
+            results = [t for t in results if (t.get("amount") or 0) > 0]
+        result = {
+            "totalCount": result.get("totalCount", 0),
+            "results": results,
+        }
+
+    return result
 
 
 def format_csv(transactions: list[dict]) -> str:

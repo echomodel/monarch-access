@@ -537,6 +537,109 @@ mutation Common_MarkAsNotRecurring($streamId: ID!) {
 }
 """
 
+# =============================================================================
+# Transaction Rules
+# =============================================================================
+
+TRANSACTION_RULES_QUERY = """
+query GetTransactionRules {
+  transactionRules {
+    id
+    order
+    merchantCriteriaUseOriginalStatement
+    merchantCriteria {
+      operator
+      value
+    }
+    originalStatementCriteria {
+      operator
+      value
+    }
+    merchantNameCriteria {
+      operator
+      value
+    }
+    amountCriteria {
+      operator
+      isExpense
+      value
+      valueRange {
+        lower
+        upper
+      }
+    }
+    categoryIds
+    accountIds
+    categories {
+      id
+      name
+      icon
+    }
+    accounts {
+      id
+      displayName
+    }
+    setMerchantAction {
+      id
+      name
+    }
+    setCategoryAction {
+      id
+      name
+      icon
+    }
+    addTagsAction {
+      id
+      name
+      color
+    }
+    linkGoalAction {
+      id
+      name
+    }
+    reviewStatusAction
+    setHideFromReportsAction
+    sendNotificationAction
+    splitTransactionsAction {
+      amountType
+      splitsInfo {
+        categoryId
+        merchantName
+        amount
+      }
+    }
+    recentApplicationCount
+    lastAppliedAt
+  }
+}
+"""
+
+CREATE_TRANSACTION_RULE_MUTATION = """
+mutation Common_CreateTransactionRuleMutationV2($input: CreateTransactionRuleInput!) {
+  createTransactionRuleV2(input: $input) {
+    errors {
+      fieldErrors {
+        field
+        messages
+      }
+      message
+      code
+    }
+  }
+}
+"""
+
+DELETE_TRANSACTION_RULE_MUTATION = """
+mutation Common_DeleteTransactionRule($id: ID!) {
+  deleteTransactionRule(id: $id) {
+    success
+    errors {
+      message
+    }
+  }
+}
+"""
+
 RECURRING_TRANSACTION_ITEMS_QUERY = """
 query Web_GetUpcomingRecurringTransactionItems($startDate: Date!, $endDate: Date!, $filters: RecurringTransactionFilter) {
   recurringTransactionItems(

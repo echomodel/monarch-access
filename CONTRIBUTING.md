@@ -9,7 +9,6 @@ monarch-access/
 ├── monarch/              # SDK package
 │   ├── cli.py            # CLI entry point (monarch command)
 │   ├── client.py         # MonarchClient - auth & API requests
-│   ├── config.py         # Config/token path management
 │   ├── queries.py        # GraphQL queries
 │   ├── accounts.py       # Account operations & formatting
 │   ├── categories.py     # Category operations
@@ -69,7 +68,7 @@ make integration-test  # Live API tests (requires token)
 ## Architecture
 
 This project follows a CLI/MCP/SDK layered architecture:
-- **SDK layer** (`monarch/*.py`): Business logic, reusable — `client.py` (auth + GraphQL), `config.py` (paths), operation modules (accounts, categories, transactions, recurring)
+- **SDK layer** (`monarch/*.py`): Business logic, reusable — `client.py` (auth + GraphQL), operation modules (accounts, categories, transactions, recurring)
 - **CLI layer** (`monarch/cli.py`): Thin Click wrapper
 - **MCP layer** (`monarch/mcp/tools.py`): Plain async functions registered by [mcp-app](https://github.com/echomodel/mcp-app). `MonarchSDK` in `client.py` bridges mcp-app's `current_user` context to the SDK.
 

@@ -35,6 +35,7 @@ def transactions_group():
 @click.option("--merchant", help="Filter by merchant name (supports * wildcards)")
 @click.option("--notes", help="Filter by notes content (supports * wildcards)")
 @click.option("--original-statement", "original_statement", help="Filter by original statement (supports * wildcards)")
+@click.option("--expenses/--income", "is_expense", default=None, help="Filter: --expenses for charges, --income for deposits/payments")
 @click.option("--limit", default=1000, help="Max transactions to fetch")
 def list_transactions(
     output_format: str,
@@ -45,13 +46,14 @@ def list_transactions(
     merchant: Optional[str],
     notes: Optional[str],
     original_statement: Optional[str],
+    is_expense: Optional[bool],
     limit: int,
 ):
     """List transactions with optional filters."""
     try:
         result = _list_transactions(
             output_format, account, category, start_date, end_date,
-            merchant, notes, original_statement, limit
+            merchant, notes, original_statement, is_expense, limit
         )
         click.echo(result)
     except AuthenticationError as e:
@@ -71,6 +73,7 @@ def _list_transactions(
     merchant: Optional[str],
     notes: Optional[str],
     original_statement: Optional[str],
+    is_expense: Optional[bool],
     limit: int,
 ) -> str:
     """Implementation of list transactions."""
@@ -109,6 +112,7 @@ def _list_transactions(
         end_date=end_date,
         account_ids=account_ids,
         category_ids=category_ids,
+        is_expense=is_expense,
     )
 
     txns = data.get("results", [])
@@ -645,6 +649,131 @@ def _net_worth(output_format: str) -> str:
         return net_worth.format_csv(report)
     else:
         return net_worth.format_text(report)
+
+
+@cli.group("rules", invoke_without_command=True)
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+@click.pass_context
+def rules_group(ctx, output_format: str):
+    """Manage transaction auto-categorization rules.
+
+    Without a subcommand, lists all rules.
+    """
+    ctx.ensure_object(dict)
+    ctx.obj["output_format"] = output_format
+    if ctx.invoked_subcommand is None:
+        try:
+            result = _list_rules(output_format)
+            click.echo(result)
+        except AuthenticationError as e:
+            click.echo(f"Authentication error: {e}", err=True)
+            sys.exit(1)
+        except APIError as e:
+            click.echo(f"API error: {e}", err=True)
+            sys.exit(1)
+
+
+@rules_group.command("list")
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def rules_list(output_format: str):
+    """List all transaction rules."""
+    try:
+        result = _list_rules(output_format)
+        click.echo(result)
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+
+
+def _list_rules(output_format: str) -> str:
+    """Implementation of list rules."""
+    import asyncio
+    from .rules import get_rules, format_rule
+    from .client import MonarchClient
+    from .providers.api.provider import _load_token
+
+    async def _fetch():
+        client = MonarchClient(token=_load_token())
+        raw_rules = await get_rules(client)
+        return [format_rule(r) for r in raw_rules]
+
+    rules = asyncio.run(_fetch())
+
+    if output_format == "json":
+        return json.dumps(rules, indent=2, default=str)
+    else:
+        if not rules:
+            return "No rules configured."
+        lines = [f"RULES ({len(rules)})"]
+        lines.append("-" * 60)
+        for r in rules:
+            criteria = r.get("criteria", {})
+            actions = r.get("actions", {})
+
+            # Build criteria summary
+            parts = []
+            if "merchant" in criteria:
+                for mc in criteria["merchant"]:
+                    parts.append(f"merchant {mc['operator']} \"{mc['value']}\"")
+            if "original_statement" in criteria:
+                for os_c in criteria["original_statement"]:
+                    parts.append(f"statement {os_c['operator']} \"{os_c['value']}\"")
+            if "amount" in criteria:
+                ac = criteria["amount"]
+                direction = "expense" if ac.get("is_expense") else "income"
+                parts.append(f"amount {ac['operator']} {ac.get('value', '')} ({direction})")
+            if "accounts" in criteria:
+                names = [a["name"] for a in criteria["accounts"]]
+                parts.append(f"accounts: {', '.join(names)}")
+
+            # Build action summary
+            action_parts = []
+            if "set_category" in actions:
+                action_parts.append(f"→ {actions['set_category']['name']}")
+            if "set_merchant" in actions:
+                action_parts.append(f"→ merchant: {actions['set_merchant']}")
+            if "add_tags" in actions:
+                tag_names = [t["name"] for t in actions["add_tags"]]
+                action_parts.append(f"→ tags: {', '.join(tag_names)}")
+
+            criteria_str = " & ".join(parts) if parts else "(no criteria)"
+            action_str = " ".join(action_parts) if action_parts else "(no action)"
+            applied = r.get("recent_application_count", 0)
+
+            lines.append(f"  [{r['id']}] {criteria_str} {action_str} (applied: {applied}x)")
+
+        return "\n".join(lines)
+
+
+@rules_group.command("delete")
+@click.argument("rule_id")
+def rules_delete(rule_id: str):
+    """Delete a transaction rule by ID."""
+    import asyncio
+    from .rules import delete_rule
+    from .client import MonarchClient
+    from .providers.api.provider import _load_token
+
+    try:
+        async def _delete():
+            client = MonarchClient(token=_load_token())
+            return await delete_rule(client, rule_id)
+
+        result = asyncio.run(_delete())
+        if result.get("success"):
+            click.echo(f"Deleted rule {rule_id}")
+        else:
+            click.echo(f"Failed to delete rule {rule_id}", err=True)
+            sys.exit(1)
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

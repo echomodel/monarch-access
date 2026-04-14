@@ -97,7 +97,7 @@ Token may have expired. Get a new one:
 1. Go to https://app.monarch.com/ and log in
 2. Open DevTools (F12) → Console
 3. Run: `JSON.parse(JSON.parse(localStorage.getItem("persist:root")).user).token`
-4. Save: `monarch auth "NEW_TOKEN"`
+4. Save: `monarch-admin connect local && monarch-admin users add local --token $MONARCH_SESSION_TOKEN`
 
 ### Server not starting
 
