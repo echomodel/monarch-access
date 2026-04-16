@@ -1,7 +1,6 @@
 """Monarch API provider implementation."""
 
 import asyncio
-import os
 from typing import Any, Optional
 
 from ...client import MonarchClient, APIError, AuthenticationError
@@ -19,16 +18,7 @@ from ...queries import (
 
 
 def _load_token() -> str:
-    """Load the Monarch session token.
-
-    Priority:
-    1. MONARCH_TOKEN environment variable
-    2. mcp-app local user store ("local" user)
-    """
-    env_token = os.environ.get("MONARCH_TOKEN")
-    if env_token:
-        return env_token.strip()
-
+    """Load the Monarch session token from the mcp-app local user store."""
     from mcp_app import FileSystemUserDataStore
     store = FileSystemUserDataStore("monarch")
     user_data = store.load("local", "user")

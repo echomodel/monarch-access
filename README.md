@@ -70,8 +70,6 @@ Monarch doesn't have a public API, so you need to grab your session token from t
 
 The token is stored in the local user store and used by both the CLI and MCP server. Tokens typically last several months — repeat these steps when yours expires.
 
-**Environment variable override:** You can set `MONARCH_TOKEN` to override the stored token.
-
 ## CLI Usage
 
 All commands default to text format with ASCII tables. Use `--format json` or `--format csv` for machine-readable output.
@@ -263,7 +261,22 @@ For detailed documentation, see **[MCP-SERVER.md](./MCP-SERVER.md)**.
 
 ## Cloud Deployment (Optional)
 
-This repo is configured for cloud deployment to GCP Cloud Run via [gapp](https://github.com/krisrowe/gapp). This deploys monarch-access as an HTTP MCP server with built-in authentication — your Monarch session token stays on the server and is never exposed to clients. Clients authenticate with JWTs issued by `monarch-admin`.
+This repo is configured for cloud deployment to GCP Cloud Run via [gapp](https://github.com/krisrowe/gapp). Deploying monarch-access as an HTTP MCP server means your Monarch session token stays on the server and is never exposed to clients — each client authenticates with a JWT issued by `monarch-admin`.
+
+### Runtime contract
+
+The MCP server reads these environment variables at startup. `gapp.yaml` in this repo wires them up for Cloud Run; any other host must provide the same:
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `SIGNING_KEY` | yes | JWT signing secret. Sourced from Google Secret Manager via gapp (`generate: true`). Retrieve later with `gapp secret get`. |
+| `APP_USERS_PATH` | yes for durable deploys | Directory for per-user profiles. Must be a persistent path — gapp maps this to a mounted volume. |
+| `JWT_AUD` | no | Expected JWT audience claim. Leave unset unless you're running multiple apps with a shared signing key. |
+| `TOKEN_DURATION_SECONDS` | no | Lifetime of newly issued JWTs. Defaults to ~10 years. |
+
+The server serves the MCP endpoint at `/`, a liveness probe at `/health`, and admin REST endpoints under `/admin/*`.
+
+### Deploy
 
 ```bash
 # Install gapp CLI
@@ -272,17 +285,72 @@ pipx install git+https://github.com/krisrowe/gapp.git
 # Attach a GCP project and deploy
 gapp setup your-gcp-project-id
 gapp deploy
-
-# Register a user with their Monarch session token (see Authentication above)
-monarch-admin connect https://your-service-url
-monarch-admin users add user@example.com --token $MONARCH_SESSION_TOKEN
 ```
 
-See the [gapp repo](https://github.com/krisrowe/gapp) for deployment documentation.
+### Connect the admin CLI
+
+Retrieve the generated signing key from Secret Manager and point the admin CLI at the deployed instance:
+
+```bash
+SIGNING_KEY=$(gapp secret get SIGNING_KEY --plaintext)
+monarch-admin connect https://your-service-url --signing-key "$SIGNING_KEY"
+```
+
+`connect` persists the URL and signing key to `~/.config/monarch/setup.json`, so subsequent `monarch-admin` commands don't need the flags repeated.
+
+### Verify the deployment
+
+```bash
+monarch-admin health
+```
+
+### Register a user
+
+```bash
+monarch-admin users add user@example.com --token "$MONARCH_SESSION_TOKEN"
+```
+
+See [Authentication](#authentication) for how to obtain `$MONARCH_SESSION_TOKEN`. To rotate a user's token, revoke and re-add:
+
+```bash
+monarch-admin users revoke user@example.com
+monarch-admin users add user@example.com --token "$NEW_TOKEN"
+```
+
+### Issue a JWT for an MCP client
+
+```bash
+monarch-admin tokens create user@example.com
+```
+
+Copy the returned token and register the remote server with your MCP client. Both Claude Code and Gemini CLI expand `${VAR}` in MCP config, so keep the token in an env var rather than pasting it into config files:
+
+```bash
+export MONARCH_JWT="<token from tokens create>"
+
+# Claude Code
+claude mcp add --scope user --transport http monarch https://your-service-url/ \
+  --header "Authorization: Bearer \${MONARCH_JWT}"
+
+# Gemini CLI
+gemini mcp add --transport http monarch https://your-service-url/ \
+  --header "Authorization: Bearer \${MONARCH_JWT}"
+```
+
+See the [gapp repo](https://github.com/krisrowe/gapp) for deeper deployment documentation.
 
 ## Development
 
 See **[CONTRIBUTING.md](./CONTRIBUTING.md)** for development setup, testing, and architecture.
+
+## For agents
+
+If you are a coding agent operating this repo with plugin support, the
+[author-mcp-app](https://github.com/echomodel/claude-coding) and
+[mcp-app-admin](https://github.com/echomodel/claude-coding) skills
+provide step-by-step workflows for authoring and operating apps on the
+mcp-app framework. They are optional — this README and
+[CONTRIBUTING.md](./CONTRIBUTING.md) are self-sufficient.
 
 ## License
 
