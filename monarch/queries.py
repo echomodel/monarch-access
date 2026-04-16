@@ -632,9 +632,54 @@ mutation Common_CreateTransactionRuleMutationV2($input: CreateTransactionRuleInp
 DELETE_TRANSACTION_RULE_MUTATION = """
 mutation Common_DeleteTransactionRule($id: ID!) {
   deleteTransactionRule(id: $id) {
-    success
+    deleted
     errors {
+      fieldErrors {
+        field
+        messages
+      }
       message
+      code
+    }
+  }
+}
+"""
+
+PREVIEW_TRANSACTION_RULE_QUERY = """
+query Common_PreviewTransactionRule($rule: TransactionRulePreviewInput!, $offset: Int) {
+  transactionRulePreview(input: $rule) {
+    totalCount
+    results(offset: $offset, limit: 30) {
+      newName
+      newSplitTransactions
+      newCategory {
+        id
+        icon
+        name
+      }
+      newHideFromReports
+      newTags {
+        id
+        name
+        color
+      }
+      transaction {
+        id
+        date
+        amount
+        merchant {
+          id
+          name
+        }
+        category {
+          id
+          name
+        }
+        account {
+          id
+          displayName
+        }
+      }
     }
   }
 }

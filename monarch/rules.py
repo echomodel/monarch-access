@@ -219,7 +219,8 @@ async def delete_rule(client, rule_id: str) -> dict:
     result = data.get("deleteTransactionRule", {})
     if result.get("errors"):
         errors = result["errors"]
-        msg = errors[0].get("message") if isinstance(errors, list) and errors else str(errors)
+        msg = errors.get("message") or str(errors.get("fieldErrors", []))
         from .client import APIError
         raise APIError(f"Delete rule failed: {msg}")
-    return {"success": result.get("success", False)}
+    deleted = result.get("deleted", False)
+    return {"success": deleted, "deleted": deleted}

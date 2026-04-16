@@ -17,6 +17,7 @@ class LocalProvider:
         self._accounts = self._db.table("accounts")
         self._categories = self._db.table("categories")
         self._recurring = self._db.table("recurring")
+        self._rules = self._db.table("rules")
 
     def get_transactions(
         self,
@@ -221,6 +222,21 @@ class LocalProvider:
         self._transactions.insert(txn)
 
         return txn
+
+    def get_rules(self) -> list[dict]:
+        """Get all transaction rules."""
+        rules = self._rules.all()
+        rules.sort(key=lambda r: r.get("order", 0))
+        return rules
+
+    def delete_rule(self, rule_id: str) -> dict:
+        """Delete a rule by ID."""
+        Rule = Query()
+        result = self._rules.search(Rule.id == rule_id)
+        if not result:
+            raise ValueError(f"Rule not found: {rule_id}")
+        self._rules.remove(Rule.id == rule_id)
+        return {"deleted": True}
 
     def close(self):
         """Close the database connection."""

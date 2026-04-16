@@ -148,10 +148,19 @@ def generate_test_data(output_path: Path = None) -> dict:
             recurring_table.insert(item)
             recurring_count += 1
 
+    # Insert rules as-is from seed (no generation needed)
+    rules_seeds = seed.get("rules", [])
+    if rules_seeds:
+        rules_table = db.table("rules")
+        for rule in rules_seeds:
+            rules_table.insert(rule)
+
     db.close()
 
     print(f"Generated {total_txn_count} transactions across {len(seed['accounts'])} accounts")
     print(f"Generated {recurring_count} recurring items from {len(recurring_seeds)} streams")
+    if rules_seeds:
+        print(f"Inserted {len(rules_seeds)} rules")
     print(f"Data written to: {output_path}")
 
     return {"transactions": total_txn_count, "accounts": len(seed["accounts"]), "categories": len(seed["categories"])}
