@@ -261,7 +261,7 @@ For detailed documentation, see **[MCP-SERVER.md](./MCP-SERVER.md)**.
 
 ## Cloud Deployment (Optional)
 
-This repo is configured for cloud deployment to GCP Cloud Run via [gapp](https://github.com/krisrowe/gapp). Deploying monarch-access as an HTTP MCP server means your Monarch session token stays on the server and is never exposed to clients — each client authenticates with a JWT issued by `monarch-admin`.
+This repo is configured for cloud deployment to GCP Cloud Run via [gapp](https://github.com/echomodel/gapp). Deploying monarch-access as an HTTP MCP server means your Monarch session token stays on the server and is never exposed to clients — each client authenticates with a JWT issued by `monarch-admin`.
 
 ### Runtime contract
 
@@ -280,7 +280,7 @@ The server serves the MCP endpoint at `/`, a liveness probe at `/health`, and ad
 
 ```bash
 # Install gapp CLI
-pipx install git+https://github.com/krisrowe/gapp.git
+pipx install git+https://github.com/echomodel/gapp.git
 
 # Attach a GCP project and deploy
 gapp setup your-gcp-project-id
@@ -337,7 +337,7 @@ gemini mcp add --transport http monarch https://your-service-url/ \
   --header "Authorization: Bearer \${MONARCH_JWT}"
 ```
 
-See the [gapp repo](https://github.com/krisrowe/gapp) for deeper deployment documentation.
+See the [gapp repo](https://github.com/echomodel/gapp) for deeper deployment documentation.
 
 ## Development
 

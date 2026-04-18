@@ -1,7 +1,7 @@
 # gapp deployment manifest — optional cloud deployment configuration.
 #
 # This file configures deployment to GCP Cloud Run via gapp
-# (https://github.com/krisrowe/gapp). gapp provides simplified,
+# (https://github.com/echomodel/gapp). gapp provides simplified,
 # secure, scalable cloud deployment with credential mediation,
 # so upstream tokens never leave the server.
 #
