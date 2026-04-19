@@ -218,28 +218,7 @@ asyncio.run(main())
 
 ## MCP Server for AI Assistants
 
-The `monarch-mcp` command exposes Monarch data via the [Model Context Protocol](https://modelcontextprotocol.io/), enabling AI assistants like Claude and Gemini to access your financial data.
-
-### Setup
-
-Register a local MCP user with your Monarch token:
-
-```bash
-monarch-admin connect local
-monarch-admin users add local --token $MONARCH_SESSION_TOKEN
-```
-
-### Register with Claude Code
-
-```bash
-claude mcp add --scope user monarch -- monarch-mcp stdio --user local
-```
-
-### Register with Gemini CLI
-
-```bash
-gemini mcp add monarch -- monarch-mcp stdio --user local
-```
+The `monarch-mcp` command exposes Monarch data via the [Model Context Protocol](https://modelcontextprotocol.io/), enabling AI assistants like Claude and Gemini to access your financial data. See [Deployment](#deployment) below for how to run it (stdio locally or HTTP anywhere).
 
 ### Available Tools
 
