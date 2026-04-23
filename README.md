@@ -261,38 +261,26 @@ For detailed documentation, see **[MCP-SERVER.md](./MCP-SERVER.md)**.
 
 ## Cloud Deployment (Optional)
 
-This repo is configured for cloud deployment to GCP Cloud Run via [gapp](https://github.com/echomodel/gapp). Deploying monarch-access as an HTTP MCP server means your Monarch session token stays on the server and is never exposed to clients — each client authenticates with a JWT issued by `monarch-admin`.
+Deploying monarch-access as an HTTP MCP server means your Monarch session token stays on the server and is never exposed to clients — each client authenticates with a JWT issued by `monarch-admin`.
 
 ### Runtime contract
 
-The MCP server reads these environment variables at startup. `gapp.yaml` in this repo wires them up for Cloud Run; any other host must provide the same:
+The MCP server reads these environment variables at startup. Any host must provide them:
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `SIGNING_KEY` | yes | JWT signing secret. Sourced from Google Secret Manager via gapp (`generate: true`). Retrieve later with `gapp secret get`. |
-| `APP_USERS_PATH` | yes for durable deploys | Directory for per-user profiles. Must be a persistent path — gapp maps this to a mounted volume. |
+| `SIGNING_KEY` | yes | JWT signing secret. Generate once with `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'` and supply via your host's secret mechanism. |
+| `APP_USERS_PATH` | yes for durable deploys | Directory for per-user profiles. Must be a persistent path — mount a durable volume. |
 | `JWT_AUD` | no | Expected JWT audience claim. Leave unset unless you're running multiple apps with a shared signing key. |
 | `TOKEN_DURATION_SECONDS` | no | Lifetime of newly issued JWTs. Defaults to ~10 years. |
 
 The server serves the MCP endpoint at `/`, a liveness probe at `/health`, and admin REST endpoints under `/admin/*`.
 
-### Deploy
-
-```bash
-# Install gapp CLI
-pipx install git+https://github.com/echomodel/gapp.git
-
-# Attach a GCP project and deploy
-gapp setup your-gcp-project-id
-gapp deploy
-```
-
 ### Connect the admin CLI
 
-Retrieve the generated signing key from Secret Manager and point the admin CLI at the deployed instance:
+Once the service is running, point the admin CLI at it with the same `SIGNING_KEY` the server is using:
 
 ```bash
-SIGNING_KEY=$(gapp secret get SIGNING_KEY --plaintext)
 monarch-admin connect https://your-service-url --signing-key "$SIGNING_KEY"
 ```
 
@@ -336,8 +324,6 @@ claude mcp add --scope user --transport http monarch https://your-service-url/ \
 gemini mcp add --transport http monarch https://your-service-url/ \
   --header "Authorization: Bearer \${MONARCH_JWT}"
 ```
-
-See the [gapp repo](https://github.com/echomodel/gapp) for deeper deployment documentation.
 
 ## Development
 
