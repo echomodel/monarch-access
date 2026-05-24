@@ -55,6 +55,23 @@ class TransactionsProvider(Protocol):
         """
         ...
 
+    def create_transactions(self, transactions: list[dict]) -> dict:
+        """Create one or more manual transactions.
+
+        Each input dict requires: date, account_id, amount, merchant_name,
+        category_id. Optional: notes, update_balance.
+
+        Returns per-item result envelope with success/failure split.
+        """
+        ...
+
+    def delete_transactions(self, transaction_ids: list[str]) -> dict:
+        """Delete one or more transactions by ID.
+
+        Returns per-item result envelope with success/failure split.
+        """
+        ...
+
 
 @runtime_checkable
 class AccountsProvider(Protocol):

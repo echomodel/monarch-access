@@ -8,6 +8,7 @@ from ...queries import (
     ACCOUNTS_QUERY,
     BULK_UPDATE_TRANSACTIONS_MUTATION,
     CREATE_TRANSACTION_MUTATION,
+    DELETE_TRANSACTION_MUTATION,
     GET_TRANSACTION_QUERY,
     RECURRING_TRANSACTION_ITEMS_QUERY,
     SPLIT_TRANSACTION_MUTATION,
@@ -312,59 +313,100 @@ class APIProvider:
         from monarch.recurring import mark_as_not_recurring
         return await mark_as_not_recurring(self._client, stream_id)
 
-    def create_transaction(
-        self,
-        date: str,
-        account_id: str,
-        amount: float,
-        merchant_name: str,
-        category_id: str,
-        notes: str = "",
-        update_balance: bool = False,
-    ) -> dict:
-        """Create a new manual transaction.
+    def create_transactions(self, transactions: list[dict]) -> dict:
+        """Create one or more manual transactions.
 
-        Args:
-            date: Transaction date in YYYY-MM-DD format
-            account_id: The account ID for this transaction
-            amount: Transaction amount (negative for expenses)
-            merchant_name: Name of the merchant/payee
-            category_id: Category ID for this transaction
-            notes: Optional notes
-            update_balance: Whether to update account balance
-        """
-        return self._run(self._create_transaction(
-            date, account_id, amount, merchant_name, category_id, notes, update_balance
-        ))
+        Each input dict requires: date, account_id, amount, merchant_name,
+        category_id. Optional: notes (default ""), update_balance (default
+        False).
 
-    async def _create_transaction(
-        self,
-        date: str,
-        account_id: str,
-        amount: float,
-        merchant_name: str,
-        category_id: str,
-        notes: str,
-        update_balance: bool,
-    ) -> dict:
-        variables = {
-            "input": {
-                "date": date,
-                "accountId": account_id,
-                "amount": round(amount, 2),
-                "merchantName": merchant_name,
-                "categoryId": category_id,
-                "notes": notes,
-                "shouldUpdateBalance": update_balance,
+        Returns a per-item result envelope so partial successes are visible:
+            {
+              "success": bool,           # True iff all items succeeded
+              "success_count": int,
+              "failure_count": int,
+              "created": [{"index": int, "input": dict, "transaction": dict}],
+              "failed":  [{"index": int, "input": dict, "error": str}],
             }
+        """
+        return self._run(self._create_transactions(transactions))
+
+    async def _create_transactions(self, transactions: list[dict]) -> dict:
+        created: list[dict] = []
+        failed: list[dict] = []
+
+        for index, item in enumerate(transactions):
+            try:
+                variables = {
+                    "input": {
+                        "date": item["date"],
+                        "accountId": item["account_id"],
+                        "amount": round(float(item["amount"]), 2),
+                        "merchantName": item["merchant_name"],
+                        "categoryId": item["category_id"],
+                        "notes": item.get("notes", "") or "",
+                        "shouldUpdateBalance": bool(item.get("update_balance", False)),
+                    }
+                }
+                data = await self._client._request(CREATE_TRANSACTION_MUTATION, variables)
+                result = data.get("createTransaction", {})
+                if result.get("errors"):
+                    errors = result["errors"]
+                    msg = errors.get("message") or str(errors.get("fieldErrors", []))
+                    raise APIError(msg)
+                created.append({
+                    "index": index,
+                    "input": item,
+                    "transaction": result.get("transaction", {}),
+                })
+            except (KeyError, APIError, ValueError, TypeError) as e:
+                failed.append({"index": index, "input": item, "error": str(e)})
+
+        return {
+            "success": len(failed) == 0,
+            "success_count": len(created),
+            "failure_count": len(failed),
+            "created": created,
+            "failed": failed,
         }
 
-        data = await self._client._request(CREATE_TRANSACTION_MUTATION, variables)
-        result = data.get("createTransaction", {})
+    def delete_transactions(self, transaction_ids: list[str]) -> dict:
+        """Delete one or more transactions by ID.
 
-        if result.get("errors"):
-            errors = result["errors"]
-            msg = errors.get("message") or str(errors.get("fieldErrors", []))
-            raise APIError(f"Create transaction failed: {msg}")
+        Returns a per-item result envelope so partial successes are visible:
+            {
+              "success": bool,           # True iff all items succeeded
+              "success_count": int,
+              "failure_count": int,
+              "deleted": [{"index": int, "transaction_id": str}],
+              "failed":  [{"index": int, "transaction_id": str, "error": str}],
+            }
+        """
+        return self._run(self._delete_transactions(transaction_ids))
 
-        return result.get("transaction", {})
+    async def _delete_transactions(self, transaction_ids: list[str]) -> dict:
+        deleted: list[dict] = []
+        failed: list[dict] = []
+
+        for index, txn_id in enumerate(transaction_ids):
+            try:
+                variables = {"input": {"transactionId": txn_id}}
+                data = await self._client._request(DELETE_TRANSACTION_MUTATION, variables)
+                result = data.get("deleteTransaction", {})
+                if result.get("errors"):
+                    errors = result["errors"]
+                    msg = errors.get("message") or str(errors.get("fieldErrors", []))
+                    raise APIError(msg)
+                if not result.get("deleted", False):
+                    raise APIError("API reported transaction was not deleted")
+                deleted.append({"index": index, "transaction_id": txn_id})
+            except (APIError, ValueError, TypeError) as e:
+                failed.append({"index": index, "transaction_id": txn_id, "error": str(e)})
+
+        return {
+            "success": len(failed) == 0,
+            "success_count": len(deleted),
+            "failure_count": len(failed),
+            "deleted": deleted,
+            "failed": failed,
+        }

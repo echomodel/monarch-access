@@ -188,61 +188,107 @@ async def split_transaction(
         return {"error": str(e), "transaction": None, "success": False}
 
 
-async def create_transaction(
-    date: str,
-    account_id: str,
-    amount: float,
-    merchant_name: str,
-    category_id: str,
-    notes: Optional[str] = "",
-    update_balance: bool = False,
+async def create_transactions(
+    transactions: list[dict],
 ) -> dict[str, Any]:
-    """Create a new manual transaction in Monarch Money.
+    """Create one or more manual transactions in Monarch Money.
 
     Use for adding transactions to manual accounts like tracking gifts,
     loans, or other financial events not captured by linked accounts.
+    Pass a list even for a single transaction.
+
+    Each item in the list is processed independently. Partial success is
+    reported: items that fail validation or the API call are returned in
+    "failed" with their original input and error message; successful items
+    are returned in "created" with the new transaction. Position in the
+    input list is preserved via "index" so failures can be correlated.
 
     Args:
-        date: Transaction date in YYYY-MM-DD format.
-        account_id: The ID of the account. Must be a manual account. Get IDs from list_accounts.
-        amount: Transaction amount. Negative for expenses, positive for income.
-        merchant_name: Name of the merchant or payee.
-        category_id: Category ID. Get IDs from list_categories.
-        notes: Optional notes or description.
-        update_balance: Whether to update the account balance.
+        transactions: List of transaction inputs. Each item must include:
+            - date (str): Transaction date in YYYY-MM-DD format.
+            - account_id (str): The ID of the account. Must be a manual account. Get IDs from list_accounts.
+            - amount (float): Transaction amount. Negative for expenses, positive for income.
+            - merchant_name (str): Name of the merchant or payee.
+            - category_id (str): Category ID. Get IDs from list_categories.
+            Optional:
+            - notes (str): Notes or description.
+            - update_balance (bool): Whether to update the account balance.
     """
     try:
-        return await sdk.create_transaction(
-            date=date,
-            account_id=account_id,
-            amount=amount,
-            merchant_name=merchant_name,
-            category_id=category_id,
-            notes=notes or "",
-            update_balance=update_balance,
-        )
+        if not transactions:
+            return {
+                "success": False,
+                "success_count": 0,
+                "failure_count": 0,
+                "created": [],
+                "failed": [],
+                "error": "No transactions provided",
+            }
+        return await sdk.create_transactions(transactions)
     except (AuthenticationError, APIError) as e:
-        return {"error": str(e), "transaction": None, "success": False}
+        return {
+            "error": str(e),
+            "success": False,
+            "success_count": 0,
+            "failure_count": len(transactions),
+            "created": [],
+            "failed": [],
+        }
     except Exception as e:
-        logger.error(f"Error creating transaction: {e}")
-        return {"error": str(e), "transaction": None, "success": False}
+        logger.error(f"Error creating transactions: {e}")
+        return {
+            "error": str(e),
+            "success": False,
+            "success_count": 0,
+            "failure_count": len(transactions),
+            "created": [],
+            "failed": [],
+        }
 
 
-async def delete_transaction(
-    transaction_id: str,
+async def delete_transactions(
+    transaction_ids: list[str],
 ) -> dict[str, Any]:
-    """Delete a transaction from Monarch Money. This action cannot be undone.
+    """Delete one or more transactions from Monarch Money. This action cannot be undone.
+
+    Pass a list even for a single transaction. Each ID is processed
+    independently. Partial success is reported: successfully deleted IDs
+    are returned in "deleted", failures in "failed" with the ID and error
+    message. Position in the input list is preserved via "index".
 
     Args:
-        transaction_id: The ID of the transaction to delete.
+        transaction_ids: List of transaction IDs to delete.
     """
     try:
-        return await sdk.delete_transaction(transaction_id)
+        if not transaction_ids:
+            return {
+                "success": False,
+                "success_count": 0,
+                "failure_count": 0,
+                "deleted": [],
+                "failed": [],
+                "error": "No transaction IDs provided",
+            }
+        return await sdk.delete_transactions(transaction_ids)
     except (AuthenticationError, APIError) as e:
-        return {"error": str(e), "deleted": False, "success": False}
+        return {
+            "error": str(e),
+            "success": False,
+            "success_count": 0,
+            "failure_count": len(transaction_ids),
+            "deleted": [],
+            "failed": [],
+        }
     except Exception as e:
-        logger.error(f"Error deleting transaction: {e}")
-        return {"error": str(e), "deleted": False, "success": False}
+        logger.error(f"Error deleting transactions: {e}")
+        return {
+            "error": str(e),
+            "success": False,
+            "success_count": 0,
+            "failure_count": len(transaction_ids),
+            "deleted": [],
+            "failed": [],
+        }
 
 
 async def list_recurring() -> dict[str, Any]:

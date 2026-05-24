@@ -376,17 +376,24 @@ def _create_transaction(
         return json.dumps({"error": f"Category not found: {category}"})
     category_id = matching_cat[0]["id"]
 
-    # Create the transaction
-    created = provider.create_transaction(
-        date=date,
-        account_id=account_id,
-        amount=amount,
-        merchant_name=merchant,
-        category_id=category_id,
-        notes=notes,
-        update_balance=update_balance,
-    )
+    # Create the transaction (SDK is plural-only; wrap as list of one)
+    result = provider.create_transactions([{
+        "date": date,
+        "account_id": account_id,
+        "amount": amount,
+        "merchant_name": merchant,
+        "category_id": category_id,
+        "notes": notes,
+        "update_balance": update_balance,
+    }])
 
+    if not result["success"]:
+        failure = result["failed"][0]
+        if output_format == "json":
+            return json.dumps({"error": failure["error"]}, indent=2)
+        return f"Error creating transaction: {failure['error']}"
+
+    created = result["created"][0]["transaction"]
     if output_format == "json":
         return json.dumps(created, indent=2, default=str)
     else:

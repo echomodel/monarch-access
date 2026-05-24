@@ -256,8 +256,8 @@ gemini mcp add monarch -- monarch-mcp stdio --user local
 | `update_transaction` | Update category, notes, etc. |
 | `mark_transactions_reviewed` | Bulk mark as reviewed |
 | `split_transaction` | Split across categories |
-| `create_transaction` | Create manual transaction |
-| `delete_transaction` | Delete a transaction |
+| `create_transactions` | Create one or more manual transactions (partial success reported) |
+| `delete_transactions` | Delete one or more transactions (partial success reported) |
 | `list_recurring` | List recurring obligations |
 | `update_recurring` | Update recurring stream settings |
 

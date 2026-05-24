@@ -150,78 +150,121 @@ class LocalProvider:
         filtered.sort(key=lambda item: item.get("date", ""))
         return filtered
 
-    def create_transaction(
-        self,
-        date: str,
-        account_id: str,
-        amount: float,
-        merchant_name: str,
-        category_id: str,
-        notes: str = "",
-        update_balance: bool = False,
-    ) -> dict:
-        """Create a new transaction.
+    def create_transactions(self, transactions: list[dict]) -> dict:
+        """Create one or more transactions.
 
-        Args:
-            date: Transaction date in YYYY-MM-DD format
-            account_id: The account ID for this transaction
-            amount: Transaction amount (negative for expenses)
-            merchant_name: Name of the merchant/payee
-            category_id: Category ID for this transaction
-            notes: Optional notes
-            update_balance: Whether to update account balance (ignored in local provider)
+        Each input dict requires: date, account_id, amount, merchant_name,
+        category_id. Optional: notes (default ""), update_balance (ignored
+        in local provider).
+
+        Returns a per-item result envelope so partial successes are visible:
+            {
+              "success": bool,           # True iff all items succeeded
+              "success_count": int,
+              "failure_count": int,
+              "created": [{"index": int, "input": dict, "transaction": dict}],
+              "failed":  [{"index": int, "input": dict, "error": str}],
+            }
         """
         import uuid
 
-        # Look up account
-        Acct = Query()
-        acct = self._accounts.search(Acct.id == account_id)
-        if not acct:
-            raise ValueError(f"Account not found: {account_id}")
-        acct = acct[0]
+        created: list[dict] = []
+        failed: list[dict] = []
 
-        # Look up category
-        Cat = Query()
-        cat = self._categories.search(Cat.id == category_id)
-        if not cat:
-            raise ValueError(f"Category not found: {category_id}")
-        cat = cat[0]
+        for index, item in enumerate(transactions):
+            try:
+                date = item["date"]
+                account_id = item["account_id"]
+                amount = float(item["amount"])
+                merchant_name = item["merchant_name"]
+                category_id = item["category_id"]
+                notes = item.get("notes", "") or ""
 
-        # Generate a unique ID
-        txn_id = str(uuid.uuid4().int)[:18]
+                Acct = Query()
+                acct = self._accounts.search(Acct.id == account_id)
+                if not acct:
+                    raise ValueError(f"Account not found: {account_id}")
+                acct = acct[0]
 
-        # Create transaction document
-        txn = {
-            "id": txn_id,
-            "amount": round(amount, 2),
-            "date": date,
-            "notes": notes,
-            "pending": False,
-            "hideFromReports": False,
-            "needsReview": False,
-            "plaidName": "",
-            "isRecurring": False,
-            "reviewStatus": None,
-            "isSplitTransaction": False,
-            "account": {
-                "id": account_id,
-                "displayName": acct.get("displayName", ""),
-            },
-            "category": {
-                "id": category_id,
-                "name": cat.get("name", ""),
-            },
-            "merchant": {
-                "id": str(uuid.uuid4().int)[:18],
-                "name": merchant_name,
-            },
-            "tags": [],
+                Cat = Query()
+                cat = self._categories.search(Cat.id == category_id)
+                if not cat:
+                    raise ValueError(f"Category not found: {category_id}")
+                cat = cat[0]
+
+                txn_id = str(uuid.uuid4().int)[:18]
+                txn = {
+                    "id": txn_id,
+                    "amount": round(amount, 2),
+                    "date": date,
+                    "notes": notes,
+                    "pending": False,
+                    "hideFromReports": False,
+                    "needsReview": False,
+                    "plaidName": "",
+                    "isRecurring": False,
+                    "reviewStatus": None,
+                    "isSplitTransaction": False,
+                    "account": {
+                        "id": account_id,
+                        "displayName": acct.get("displayName", ""),
+                    },
+                    "category": {
+                        "id": category_id,
+                        "name": cat.get("name", ""),
+                    },
+                    "merchant": {
+                        "id": str(uuid.uuid4().int)[:18],
+                        "name": merchant_name,
+                    },
+                    "tags": [],
+                }
+                self._transactions.insert(txn)
+                created.append({"index": index, "input": item, "transaction": txn})
+            except (KeyError, ValueError, TypeError) as e:
+                failed.append({"index": index, "input": item, "error": str(e)})
+
+        return {
+            "success": len(failed) == 0,
+            "success_count": len(created),
+            "failure_count": len(failed),
+            "created": created,
+            "failed": failed,
         }
 
-        # Insert into database
-        self._transactions.insert(txn)
+    def delete_transactions(self, transaction_ids: list[str]) -> dict:
+        """Delete one or more transactions by ID.
 
-        return txn
+        Returns a per-item result envelope so partial successes are visible:
+            {
+              "success": bool,           # True iff all items succeeded
+              "success_count": int,
+              "failure_count": int,
+              "deleted": [{"index": int, "transaction_id": str}],
+              "failed":  [{"index": int, "transaction_id": str, "error": str}],
+            }
+        """
+        deleted: list[dict] = []
+        failed: list[dict] = []
+
+        Txn = Query()
+        for index, txn_id in enumerate(transaction_ids):
+            try:
+                existing = self._transactions.search(Txn.id == txn_id)
+                if not existing:
+                    raise ValueError(f"Transaction not found: {txn_id}")
+                self._transactions.remove(Txn.id == txn_id)
+                deleted.append({"index": index, "transaction_id": txn_id})
+            except (ValueError, TypeError) as e:
+                failed.append({"index": index, "transaction_id": txn_id, "error": str(e)})
+
+        return {
+            "success": len(failed) == 0,
+            "success_count": len(deleted),
+            "failure_count": len(failed),
+            "deleted": deleted,
+            "failed": failed,
+        }
 
     def get_rules(self) -> list[dict]:
         """Get all transaction rules."""

@@ -127,27 +127,66 @@ Split a transaction into multiple parts with different categories.
 
 ---
 
-### `create_transaction`
+### `create_transactions`
 
-Create a new manual transaction.
+Create one or more manual transactions. Pass a list even for a single
+transaction. Each item is processed independently — partial successes are
+reported.
 
 **Input:**
-- `date` (string, required): YYYY-MM-DD
-- `account_id` (string, required): Must be a manual account
-- `amount` (float, required): Negative for expenses, positive for income
-- `merchant_name` (string, required)
-- `category_id` (string, required)
-- `notes` (string, optional)
-- `update_balance` (boolean, optional): Whether to update account balance
+- `transactions` (array of objects, required). Each item:
+  - `date` (string, required): YYYY-MM-DD
+  - `account_id` (string, required): Must be a manual account
+  - `amount` (float, required): Negative for expenses, positive for income
+  - `merchant_name` (string, required)
+  - `category_id` (string, required)
+  - `notes` (string, optional)
+  - `update_balance` (boolean, optional): Whether to update account balance
+
+**Output:**
+```json
+{
+  "success": false,
+  "success_count": 2,
+  "failure_count": 1,
+  "created": [
+    {"index": 0, "input": {...}, "transaction": {...}},
+    {"index": 2, "input": {...}, "transaction": {...}}
+  ],
+  "failed": [
+    {"index": 1, "input": {...}, "error": "Category not found: ..."}
+  ]
+}
+```
+
+`success` is `true` only if every item succeeded. `index` matches the
+position in the input list so failures can be correlated.
 
 ---
 
-### `delete_transaction`
+### `delete_transactions`
 
-Delete a transaction. Cannot be undone.
+Delete one or more transactions. Cannot be undone. Pass a list even for a
+single ID. Each ID is processed independently — partial successes are
+reported.
 
 **Input:**
-- `transaction_id` (string, required)
+- `transaction_ids` (array of strings, required)
+
+**Output:**
+```json
+{
+  "success": false,
+  "success_count": 1,
+  "failure_count": 1,
+  "deleted": [
+    {"index": 0, "transaction_id": "..."}
+  ],
+  "failed": [
+    {"index": 1, "transaction_id": "...", "error": "Transaction not found"}
+  ]
+}
+```
 
 ---
 

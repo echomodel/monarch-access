@@ -61,8 +61,8 @@ gemini mcp list
 | `update_transaction` | Update category, merchant, notes, or review status |
 | `mark_transactions_reviewed` | Bulk mark transactions as reviewed |
 | `split_transaction` | Split a transaction across multiple categories |
-| `create_transaction` | Create a manual transaction |
-| `delete_transaction` | Delete a transaction |
+| `create_transactions` | Create one or more manual transactions (partial success reported) |
+| `delete_transactions` | Delete one or more transactions (partial success reported) |
 | `list_recurring` | List tracked recurring obligations (bills, subscriptions, loans) |
 | `update_recurring` | Update a recurring stream's status, amount, or frequency |
 | `mark_as_not_recurring` | Permanently remove a recurring stream (deprecated — use `update_recurring`) |

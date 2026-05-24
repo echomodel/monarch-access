@@ -173,51 +173,100 @@ class MonarchSDK:
         }
 
     @classmethod
-    async def create_transaction(cls, date: str, account_id: str, amount: float,
-                                 merchant_name: str, category_id: str,
-                                 notes: str = "", update_balance: bool = False) -> dict:
+    async def create_transactions(cls, transactions: list[dict]) -> dict:
+        """Create one or more manual transactions.
+
+        Each input dict requires: date, account_id, amount, merchant_name,
+        category_id. Optional: notes (default ""), update_balance (default
+        False).
+
+        Returns a per-item result envelope so partial successes are visible:
+            {
+              "success": bool,           # True iff all items succeeded
+              "success_count": int,
+              "failure_count": int,
+              "created": [{"index": int, "input": dict, "transaction": dict}],
+              "failed":  [{"index": int, "input": dict, "error": str}],
+            }
+        """
         from .queries import CREATE_TRANSACTION_MUTATION
         client = cls._client()
-        variables = {
-            "input": {
-                "date": date,
-                "accountId": account_id,
-                "amount": round(amount, 2),
-                "merchantName": merchant_name,
-                "categoryId": category_id,
-                "notes": notes,
-                "shouldUpdateBalance": update_balance,
-            }
-        }
-        data = await client._request(CREATE_TRANSACTION_MUTATION, variables)
-        result = data.get("createTransaction", {})
-        if result.get("errors"):
-            errors = result["errors"]
-            msg = errors.get("message") or str(errors.get("fieldErrors", []))
-            raise APIError(f"Create transaction failed: {msg}")
-        txn = result.get("transaction", {})
+
+        created: list[dict] = []
+        failed: list[dict] = []
+
+        for index, item in enumerate(transactions):
+            try:
+                variables = {
+                    "input": {
+                        "date": item["date"],
+                        "accountId": item["account_id"],
+                        "amount": round(float(item["amount"]), 2),
+                        "merchantName": item["merchant_name"],
+                        "categoryId": item["category_id"],
+                        "notes": item.get("notes", "") or "",
+                        "shouldUpdateBalance": bool(item.get("update_balance", False)),
+                    }
+                }
+                data = await client._request(CREATE_TRANSACTION_MUTATION, variables)
+                result = data.get("createTransaction", {})
+                if result.get("errors"):
+                    errors = result["errors"]
+                    msg = errors.get("message") or str(errors.get("fieldErrors", []))
+                    raise APIError(msg)
+                txn = result.get("transaction", {})
+                created.append({"index": index, "input": item, "transaction": txn})
+            except (KeyError, APIError, ValueError, TypeError) as e:
+                failed.append({"index": index, "input": item, "error": str(e)})
+
         return {
-            "transaction": txn,
-            "success": True,
-            "message": f"Transaction created with ID {txn.get('id', 'unknown')}",
+            "success": len(failed) == 0,
+            "success_count": len(created),
+            "failure_count": len(failed),
+            "created": created,
+            "failed": failed,
         }
 
     @classmethod
-    async def delete_transaction(cls, transaction_id: str) -> dict:
+    async def delete_transactions(cls, transaction_ids: list[str]) -> dict:
+        """Delete one or more transactions by ID.
+
+        Returns a per-item result envelope so partial successes are visible:
+            {
+              "success": bool,           # True iff all items succeeded
+              "success_count": int,
+              "failure_count": int,
+              "deleted": [{"index": int, "transaction_id": str}],
+              "failed":  [{"index": int, "transaction_id": str, "error": str}],
+            }
+        """
         from .queries import DELETE_TRANSACTION_MUTATION
         client = cls._client()
-        variables = {"input": {"transactionId": transaction_id}}
-        data = await client._request(DELETE_TRANSACTION_MUTATION, variables)
-        result = data.get("deleteTransaction", {})
-        if result.get("errors"):
-            errors = result["errors"]
-            msg = errors.get("message") or str(errors.get("fieldErrors", []))
-            raise APIError(f"Delete failed: {msg}")
-        deleted = result.get("deleted", False)
+
+        deleted: list[dict] = []
+        failed: list[dict] = []
+
+        for index, txn_id in enumerate(transaction_ids):
+            try:
+                variables = {"input": {"transactionId": txn_id}}
+                data = await client._request(DELETE_TRANSACTION_MUTATION, variables)
+                result = data.get("deleteTransaction", {})
+                if result.get("errors"):
+                    errors = result["errors"]
+                    msg = errors.get("message") or str(errors.get("fieldErrors", []))
+                    raise APIError(msg)
+                if not result.get("deleted", False):
+                    raise APIError("API reported transaction was not deleted")
+                deleted.append({"index": index, "transaction_id": txn_id})
+            except (APIError, ValueError, TypeError) as e:
+                failed.append({"index": index, "transaction_id": txn_id, "error": str(e)})
+
         return {
+            "success": len(failed) == 0,
+            "success_count": len(deleted),
+            "failure_count": len(failed),
             "deleted": deleted,
-            "success": deleted,
-            "message": f"Transaction {transaction_id} deleted" if deleted else f"Failed to delete {transaction_id}",
+            "failed": failed,
         }
 
     @classmethod
