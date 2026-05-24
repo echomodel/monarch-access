@@ -78,10 +78,9 @@ monarch-admin connect local
 monarch-admin users add local --token $MONARCH_SESSION_TOKEN
 ```
 
-To update the token later:
+To rotate the token later:
 ```bash
-monarch-admin connect local
-monarch-admin users add local --token "NEW_TOKEN"
+monarch-admin users update-profile local token "NEW_TOKEN"
 ```
 
 ### Cloud (HTTP)
@@ -97,7 +96,7 @@ Token may have expired. Get a new one:
 1. Go to https://app.monarch.com/ and log in
 2. Open DevTools (F12) → Console
 3. Run: `JSON.parse(JSON.parse(localStorage.getItem("persist:root")).user).token`
-4. Save: `monarch-admin connect local && monarch-admin users add local --token $MONARCH_SESSION_TOKEN`
+4. Rotate: `monarch-admin users update-profile local token $MONARCH_SESSION_TOKEN`
 
 ### Server not starting
 
@@ -115,7 +114,7 @@ If it exits with errors, check that:
 - **Token storage**: Never commit tokens to version control
 - **Local stdio**: Runs locally under your user account; token stored in mcp-app's local user store
 - **Cloud HTTP**: Tokens stored server-side; clients authenticate with JWTs issued by `monarch-admin`
-- **Token expiration**: Monarch tokens expire periodically; update with `monarch-admin users add`
+- **Token expiration**: Monarch tokens expire periodically; rotate with `monarch-admin users update-profile`
 
 ## Related Documentation
 

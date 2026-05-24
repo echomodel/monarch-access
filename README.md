@@ -68,7 +68,11 @@ Monarch doesn't have a public API, so you need to grab your session token from t
    monarch-admin users add local --token $MONARCH_SESSION_TOKEN
    ```
 
-The token is stored in the local user store and used by both the CLI and MCP server. Tokens typically last several months — repeat these steps when yours expires.
+The token is stored in the local user store and used by both the CLI and MCP server. Tokens typically last several months — rotate yours with:
+
+```bash
+monarch-admin users update-profile local token $MONARCH_SESSION_TOKEN
+```
 
 ## CLI Usage
 
@@ -298,12 +302,13 @@ monarch-admin health
 monarch-admin users add user@example.com --token "$MONARCH_SESSION_TOKEN"
 ```
 
-See [Authentication](#authentication) for how to obtain `$MONARCH_SESSION_TOKEN`. To rotate a user's token, revoke and re-add:
+See [Authentication](#authentication) for how to obtain `$MONARCH_SESSION_TOKEN`. To rotate a user's token in place (keeps their JWT valid and their profile intact):
 
 ```bash
-monarch-admin users revoke user@example.com
-monarch-admin users add user@example.com --token "$NEW_TOKEN"
+monarch-admin users update-profile user@example.com token "$NEW_TOKEN"
 ```
+
+To revoke a user entirely (invalidates their JWT), use `monarch-admin users revoke user@example.com`.
 
 ### Issue a JWT for an MCP client
 
