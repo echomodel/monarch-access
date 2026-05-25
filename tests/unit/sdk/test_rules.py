@@ -129,3 +129,64 @@ class TestDeleteRule:
         ids = [r["id"] for r in remaining]
         assert "rule_002" in ids
         assert "rule_003" in ids
+
+
+class TestCreateRule:
+    """Test rule creation via local provider."""
+
+    def test_create_rule_appears_in_list(self, local_provider):
+        """A newly created rule shows up in get_rules."""
+        before = len(local_provider.get_rules())
+        result = local_provider.create_rule(
+            merchant_criteria=[{"operator": "contains", "value": "shell"}],
+            set_category_action="cat_002",
+        )
+        assert result["success"] is True
+        after = local_provider.get_rules()
+        assert len(after) == before + 1
+        ids = [r["id"] for r in after]
+        assert result["rule"]["id"] in ids
+
+    def test_create_rule_appends_to_end(self, local_provider):
+        """New rule's order is greater than every existing rule's order."""
+        before = local_provider.get_rules()
+        max_order_before = max(r["order"] for r in before)
+        result = local_provider.create_rule(
+            merchant_criteria=[{"operator": "contains", "value": "amazon"}],
+            set_category_action="cat_005",
+        )
+        assert result["rule"]["order"] > max_order_before
+
+    def test_create_rule_carries_criteria_and_action(self, local_provider):
+        """Caller-supplied criteria and actions are stored on the rule."""
+        result = local_provider.create_rule(
+            merchant_criteria=[{"operator": "eq", "value": "Verizon"}],
+            amount_criteria={"operator": "gt", "isExpense": True, "value": 50},
+            set_category_action="cat_002",
+            add_tags_action=["tag_001"],
+        )
+        rule = result["rule"]
+        assert rule["merchantCriteria"][0]["value"] == "Verizon"
+        assert rule["amountCriteria"]["value"] == 50
+        assert rule["setCategoryAction"]["id"] == "cat_002"
+        assert rule["addTagsAction"] == ["tag_001"]
+
+    def test_create_rule_resolves_account_display_names(self, local_provider):
+        """Provided account IDs come back joined with their display names."""
+        result = local_provider.create_rule(
+            merchant_criteria=[{"operator": "contains", "value": "costco"}],
+            account_ids=["acc_001"],
+            set_category_action="cat_001",
+        )
+        rule = result["rule"]
+        assert rule["accountIds"] == ["acc_001"]
+        assert rule["accounts"][0]["displayName"] == "Fairview Checking"
+
+    def test_create_rule_unknown_category_raises(self, local_provider):
+        """Setting an unknown category_id surfaces a clear error."""
+        import pytest
+        with pytest.raises(ValueError, match="Category not found"):
+            local_provider.create_rule(
+                merchant_criteria=[{"operator": "contains", "value": "x"}],
+                set_category_action="cat_nonexistent",
+            )

@@ -135,3 +135,102 @@ class TestRecurringCollapse:
     def test_collapse_empty_list(self):
         """Test that collapsing empty list returns empty."""
         assert collapse_to_streams([]) == []
+
+
+class TestMarkNotRecurring:
+    """Test removing a recurring stream from the catalog."""
+
+    def _streams_in_provider(self, local_provider):
+        today = date.today()
+        items = local_provider.get_recurring_transaction_items(
+            start_date=(today - timedelta(days=365)).isoformat(),
+            end_date=(today + timedelta(days=365)).isoformat(),
+        )
+        return {item["stream"]["id"] for item in items}
+
+    def test_mark_not_recurring_removes_target_stream(self, local_provider):
+        """Stream disappears from recurring after mark_not_recurring."""
+        ids_before = self._streams_in_provider(local_provider)
+        assert "stream_001" in ids_before
+
+        result = local_provider.mark_not_recurring("stream_001")
+        assert result["success"] is True
+
+        ids_after = self._streams_in_provider(local_provider)
+        assert "stream_001" not in ids_after
+
+    def test_mark_not_recurring_leaves_other_streams_intact(self, local_provider):
+        """Removing one stream does not affect others."""
+        ids_before = self._streams_in_provider(local_provider)
+        target = "stream_001"
+        others_before = ids_before - {target}
+
+        local_provider.mark_not_recurring(target)
+
+        ids_after = self._streams_in_provider(local_provider)
+        assert ids_after == others_before
+
+    def test_mark_not_recurring_unknown_stream_raises(self, local_provider):
+        """Unknown stream id surfaces a clear error rather than silent no-op."""
+        import pytest
+        with pytest.raises(ValueError, match="Stream not found"):
+            local_provider.mark_not_recurring("stream_nonexistent")
+
+
+class TestUpdateRecurring:
+    """Test updating fields on a recurring stream."""
+
+    def _stream_by_id(self, local_provider, stream_id):
+        today = date.today()
+        items = local_provider.get_recurring_transaction_items(
+            start_date=(today - timedelta(days=365)).isoformat(),
+            end_date=(today + timedelta(days=365)).isoformat(),
+        )
+        for item in items:
+            if item["stream"]["id"] == stream_id:
+                return item["stream"]
+        return None
+
+    def test_update_recurring_changes_amount(self, local_provider):
+        """Updating amount writes through to the stream object."""
+        result = local_provider.update_recurring("stream_001", amount=-2750.00)
+        assert result["success"] is True
+
+        stream = self._stream_by_id(local_provider, "stream_001")
+        assert stream is not None
+        assert stream["amount"] == -2750.00
+
+    def test_update_recurring_changes_frequency(self, local_provider):
+        """Updating frequency writes through to the stream object."""
+        local_provider.update_recurring("stream_001", frequency="biweekly")
+        stream = self._stream_by_id(local_provider, "stream_001")
+        assert stream["frequency"] == "biweekly"
+
+    def test_update_recurring_partial_preserves_other_fields(self, local_provider):
+        """An amount-only update leaves frequency untouched."""
+        before = self._stream_by_id(local_provider, "stream_001")
+        original_frequency = before["frequency"]
+
+        local_provider.update_recurring("stream_001", amount=-9999.99)
+
+        after = self._stream_by_id(local_provider, "stream_001")
+        assert after["amount"] == -9999.99
+        assert after["frequency"] == original_frequency
+
+    def test_update_recurring_status_removed_removes_stream(self, local_provider):
+        """status='removed' is equivalent to mark_not_recurring."""
+        result = local_provider.update_recurring("stream_001", status="removed")
+        assert result["success"] is True
+
+        today = date.today()
+        items = local_provider.get_recurring_transaction_items(
+            start_date=(today - timedelta(days=365)).isoformat(),
+            end_date=(today + timedelta(days=365)).isoformat(),
+        )
+        assert all(item["stream"]["id"] != "stream_001" for item in items)
+
+    def test_update_recurring_unknown_stream_raises(self, local_provider):
+        """Unknown stream id surfaces a clear error."""
+        import pytest
+        with pytest.raises(ValueError, match="Stream not found"):
+            local_provider.update_recurring("stream_nonexistent", amount=-1)

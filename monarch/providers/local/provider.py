@@ -281,6 +281,210 @@ class LocalProvider:
         self._rules.remove(Rule.id == rule_id)
         return {"deleted": True}
 
+    def create_rule(
+        self,
+        merchant_criteria: Optional[list[dict]] = None,
+        original_statement_criteria: Optional[list[dict]] = None,
+        amount_criteria: Optional[dict] = None,
+        account_ids: Optional[list[str]] = None,
+        category_ids: Optional[list[str]] = None,
+        set_merchant_action: Optional[str] = None,
+        set_category_action: Optional[str] = None,
+        add_tags_action: Optional[list[str]] = None,
+        apply_to_existing: bool = False,
+    ) -> dict:
+        """Create a new transaction auto-categorization rule.
+
+        Returns the same shape Monarch's API does: the new rule object,
+        appended to the end of the rules list. `apply_to_existing` is
+        accepted for parity with the real API but doesn't retroactively
+        run the rule against transactions in the local store.
+        """
+        import uuid
+
+        Cat = Query()
+        Acct = Query()
+
+        # Order is "last in the list" — Monarch's API uses 0-based ordering.
+        existing_orders = [r.get("order", 0) for r in self._rules.all()]
+        next_order = (max(existing_orders) + 1) if existing_orders else 0
+
+        # Resolve set_category_action (a category id) to {id, name, icon}.
+        set_cat = None
+        if set_category_action:
+            cat = self._categories.search(Cat.id == set_category_action)
+            if not cat:
+                raise ValueError(f"Category not found: {set_category_action}")
+            set_cat = {"id": cat[0].get("id"), "name": cat[0].get("name"), "icon": cat[0].get("icon")}
+
+        # Resolve accountIds to display names for the joined view.
+        accounts_resolved = []
+        for aid in account_ids or []:
+            acct = self._accounts.search(Acct.id == aid)
+            if acct:
+                accounts_resolved.append({"id": aid, "displayName": acct[0].get("displayName", "")})
+
+        rule_id = f"rule_{str(uuid.uuid4().int)[:12]}"
+        rule = {
+            "id": rule_id,
+            "order": next_order,
+            "merchantCriteriaUseOriginalStatement": False,
+            "merchantCriteria": merchant_criteria,
+            "originalStatementCriteria": original_statement_criteria,
+            "merchantNameCriteria": None,
+            "amountCriteria": amount_criteria,
+            "categoryIds": category_ids,
+            "accountIds": account_ids,
+            "categories": [],
+            "accounts": accounts_resolved,
+            "setMerchantAction": set_merchant_action,
+            "setCategoryAction": set_cat,
+            "addTagsAction": add_tags_action,
+            "linkGoalAction": None,
+            "reviewStatusAction": None,
+            "setHideFromReportsAction": False,
+            "sendNotificationAction": False,
+            "splitTransactionsAction": None,
+            "recentApplicationCount": 0,
+            "lastAppliedAt": None,
+        }
+        self._rules.insert(rule)
+        return {"rule": rule, "success": True}
+
+    def bulk_mark_reviewed(
+        self, transaction_ids: list[str], needs_review: bool = False
+    ) -> dict:
+        """Bulk update the needsReview flag on a list of transactions.
+
+        Mirrors the real API's bulk update: only the explicit field is
+        changed; other transaction fields are preserved. Returns the
+        shape Monarch's `bulkUpdateTransactions` mutation returns.
+        """
+        Txn = Query()
+        affected = 0
+        for txn_id in transaction_ids:
+            existing = self._transactions.search(Txn.id == txn_id)
+            if existing:
+                self._transactions.update({"needsReview": needs_review}, Txn.id == txn_id)
+                affected += 1
+        status = "needing review" if needs_review else "reviewed"
+        return {
+            "success": True,
+            "affectedCount": affected,
+            "message": f"Marked {affected} transactions as {status}",
+        }
+
+    def split_transaction(
+        self, transaction_id: str, split_data: list[dict]
+    ) -> dict:
+        """Split a transaction across multiple categories.
+
+        Validates that the sum of split amounts equals the original's
+        amount (Monarch enforces this). Marks the original as split and
+        records the splits on it. Returns the updated transaction.
+        """
+        import uuid
+
+        Txn = Query()
+        existing = self._transactions.search(Txn.id == transaction_id)
+        if not existing:
+            raise ValueError(f"Transaction not found: {transaction_id}")
+        original = existing[0]
+
+        if split_data:
+            # Sum must equal (within rounding) the original amount.
+            split_sum = round(sum(float(s.get("amount", 0)) for s in split_data), 2)
+            original_amount = round(float(original.get("amount", 0)), 2)
+            if split_sum != original_amount:
+                raise ValueError(
+                    f"Split sum {split_sum} does not equal original amount {original_amount}"
+                )
+
+        Cat = Query()
+        materialized_splits = []
+        for s in split_data:
+            cat_id = s.get("categoryId")
+            cat = self._categories.search(Cat.id == cat_id) if cat_id else []
+            if cat_id and not cat:
+                raise ValueError(f"Category not found: {cat_id}")
+            materialized_splits.append({
+                "id": str(uuid.uuid4().int)[:18],
+                "amount": round(float(s.get("amount", 0)), 2),
+                "category": {"id": cat_id, "name": cat[0].get("name", "")} if cat else None,
+                "merchant": {"name": s.get("merchantName")} if s.get("merchantName") else None,
+                "notes": s.get("notes", ""),
+            })
+
+        self._transactions.update(
+            {"isSplitTransaction": bool(split_data), "splits": materialized_splits},
+            Txn.id == transaction_id,
+        )
+        updated = self._transactions.search(Txn.id == transaction_id)[0]
+        return {
+            "transaction": updated,
+            "success": True,
+            "message": f"Transaction {transaction_id} split into {len(split_data)} parts",
+        }
+
+    def mark_not_recurring(self, stream_id: str) -> dict:
+        """Remove a recurring stream from the catalog.
+
+        Mirrors Monarch's `markStreamAsNotRecurring` mutation: removes
+        all items with the given stream id from the recurring table.
+        """
+        Item = Query()
+        before = len(self._recurring.search(Item.stream.id == stream_id))
+        if before == 0:
+            raise ValueError(f"Stream not found: {stream_id}")
+        self._recurring.remove(Item.stream.id == stream_id)
+        return {
+            "success": True,
+            "result": {"streamId": stream_id, "removed": before},
+        }
+
+    def update_recurring(
+        self,
+        stream_id: str,
+        status: Optional[str] = None,
+        amount: Optional[float] = None,
+        frequency: Optional[str] = None,
+    ) -> dict:
+        """Update fields on a recurring stream.
+
+        Updates the nested `stream` object on every item carrying that
+        stream id. Status (`active`/`inactive`/`removed`) maps to
+        merchant recurrence state in the real API; here we just record
+        it on the stream object. `removed` short-circuits to
+        `mark_not_recurring` for behavior parity.
+        """
+        if status == "removed":
+            return self.mark_not_recurring(stream_id)
+
+        Item = Query()
+        items = self._recurring.search(Item.stream.id == stream_id)
+        if not items:
+            raise ValueError(f"Stream not found: {stream_id}")
+
+        for item in items:
+            new_stream = dict(item.get("stream", {}))
+            if amount is not None:
+                new_stream["amount"] = round(float(amount), 2)
+            if frequency is not None:
+                new_stream["frequency"] = frequency
+            if status is not None:
+                new_stream["status"] = status
+            self._recurring.update({"stream": new_stream}, Item.stream.id == stream_id)
+
+        return {
+            "success": True,
+            "result": {
+                "streamId": stream_id,
+                "status": status,
+                "amount": amount,
+                "frequency": frequency,
+            },
+        }
+
     def close(self):
         """Close the database connection."""
         self._db.close()
