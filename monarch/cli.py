@@ -753,6 +753,69 @@ def _holdings(account: Optional[str], as_of_date: Optional[str], output_format: 
         return holdings_mod.format_text(items)
 
 
+@cli.group("balances")
+def balances_group():
+    """Download and upload account balance history."""
+    pass
+
+
+@balances_group.command("download")
+@click.argument("account_id")
+@click.option("-o", "--output", "output_path", help="Write CSV to a file instead of stdout")
+def balances_download(account_id: str, output_path: Optional[str]):
+    """Download an account's daily balance history as CSV (Date,Balance)."""
+    from . import balances as balances_mod
+
+    try:
+        provider = get_provider()
+        snapshots = provider.download_balance_history(account_id)
+        csv_text = balances_mod.snapshots_to_csv(snapshots)
+        if output_path:
+            with open(output_path, "w", newline="") as f:
+                f.write(csv_text)
+            click.echo(f"Wrote {len(snapshots)} snapshots to {output_path}")
+        else:
+            click.echo(csv_text, nl=False)
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+
+
+@balances_group.command("upload")
+@click.argument("account_id")
+@click.argument("csv_file", type=click.Path(exists=True))
+def balances_upload(account_id: str, csv_file: str):
+    """Replace an account's balance history from a CSV file (Date,Balance).
+
+    This REPLACES the entire existing history and sets the account's current
+    balance to the final row. The prior history is captured before the upload.
+    """
+    from . import balances as balances_mod
+
+    try:
+        with open(csv_file) as f:
+            snapshots = balances_mod.parse_balance_csv(f.read())
+        if not snapshots:
+            click.echo("No snapshots found in CSV (expected Date,Balance columns)", err=True)
+            sys.exit(1)
+        provider = get_provider()
+        result = provider.upload_balance_history(account_id, snapshots)
+        if result.get("success"):
+            click.echo(f"Uploaded {result.get('uploaded_count')} snapshots to {account_id} (status: {result.get('status')})")
+        else:
+            click.echo(f"Upload did not complete (status: {result.get('status')})", err=True)
+            sys.exit(1)
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+
+
 @cli.command("net-worth")
 @click.option("--format", "output_format", type=click.Choice(["text", "json", "csv"]), default="text", help="Output format")
 def net_worth_cmd(output_format: str):

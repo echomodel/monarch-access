@@ -48,6 +48,62 @@ async def list_categories() -> dict[str, Any]:
         return {"error": str(e), "categories": [], "count": 0}
 
 
+async def download_balance_history(
+    account_id: str,
+) -> dict[str, Any]:
+    """Download an account's daily balance history from Monarch Money.
+
+    Returns one snapshot per day from account creation through today, each
+    {"date": "YYYY-MM-DD", "balance": float}. Liabilities carry negative
+    balances. This is read-only — useful for auditing a balance curve or
+    capturing it before an upload.
+
+    Args:
+        account_id: The account to read. Get IDs from list_accounts.
+    """
+    try:
+        return await sdk.download_balance_history(account_id)
+    except AuthenticationError as e:
+        return {"error": str(e), "account_id": account_id, "snapshots": [], "count": 0}
+    except Exception as e:
+        logger.error(f"Error downloading balance history: {e}")
+        return {"error": str(e), "account_id": account_id, "snapshots": [], "count": 0}
+
+
+async def upload_balance_history(
+    account_id: str,
+    snapshots: list[dict],
+) -> dict[str, Any]:
+    """Replace an account's entire balance history with the given snapshots.
+
+    WARNING: this REPLACES all existing balance snapshots for the account and
+    sets its currentBalance to the final (latest-dated) row. The prior history
+    is downloaded first and returned under "previous_snapshots" so it can be
+    restored by uploading it back. Balance history is independent of
+    transactions: this creates no transactions and does not affect
+    income/expense reports.
+
+    Use for correcting stale balances on accounts that stopped syncing,
+    importing history for manual accounts, or migrating a balance curve
+    between accounts (e.g. a loan servicer transfer).
+
+    Args:
+        account_id: The account whose history to overwrite. Get IDs from
+            list_accounts.
+        snapshots: List of {"date": "YYYY-MM-DD", "balance": float} (negative
+            for liabilities).
+    """
+    try:
+        if not snapshots:
+            return {"success": False, "error": "No snapshots provided", "uploaded_count": 0}
+        return await sdk.upload_balance_history(account_id, snapshots)
+    except (AuthenticationError, APIError) as e:
+        return {"error": str(e), "success": False, "uploaded_count": 0}
+    except Exception as e:
+        logger.error(f"Error uploading balance history: {e}")
+        return {"error": str(e), "success": False, "uploaded_count": 0}
+
+
 async def update_account(
     account_id: str,
     name: Optional[str] = None,

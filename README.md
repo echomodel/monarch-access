@@ -200,6 +200,25 @@ links, so net worth neither double-counts nor drops retroactively. *Excluding*
 (`--exclude-net-worth`) removes the balance from net worth across all of
 history. Closing is reversible with `--reopen`.
 
+### Balance History
+
+```bash
+# Download an account's daily balance history as CSV (Date,Balance)
+monarch balances download <account_id>
+monarch balances download <account_id> -o history.csv
+
+# Replace an account's balance history from a CSV file
+monarch balances upload <account_id> history.csv
+```
+
+**Upload replaces the entire balance history** for the account and sets its
+current balance to the final row. Balance history is independent of
+transactions — uploading creates no transactions and doesn't affect
+income/expense reports. Useful for correcting stale balances on accounts that
+stopped syncing, importing history for manual accounts, or migrating a balance
+curve between accounts. Download the existing history first if you may need to
+roll back.
+
 ### Net Worth Report
 
 ```bash
@@ -302,6 +321,8 @@ gemini mcp add monarch -- monarch-mcp stdio --user local
 | `update_account` | Rename, exclude from net worth, or hide an account |
 | `close_account` | Close an account (keeps balance history in net worth) |
 | `get_holdings` | Get investment holdings (shares, cost basis, tax lots) |
+| `download_balance_history` | Download an account's daily balance snapshots |
+| `upload_balance_history` | Replace an account's balance history |
 | `list_categories` | Get all transaction categories |
 | `list_transactions` | Query transactions with filters |
 | `get_transaction` | Get a single transaction |

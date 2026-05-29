@@ -686,6 +686,39 @@ query Common_PreviewTransactionRule($rule: TransactionRulePreviewInput!, $offset
 """
 
 # =============================================================================
+# Balance History Upload
+#
+# Balance history download/upload uses REST endpoints (see client._download_balances
+# and client._upload_balances), not GraphQL. After the multipart upload returns a
+# session key, the upload is finalized in two GraphQL steps: a parse mutation to
+# kick off processing, then polling the session query until status == "completed".
+#
+# Uploading REPLACES the entire balance history for the account and sets its
+# currentBalance to the final row. It does not create transactions or affect
+# income/expense reports — only balance snapshots.
+# =============================================================================
+
+PARSE_BALANCE_HISTORY_MUTATION = """
+mutation Web_ParseUploadBalanceHistorySession($input: ParseBalanceHistoryInput!) {
+  parseBalanceHistory(input: $input) {
+    uploadBalanceHistorySession {
+      sessionKey
+      status
+    }
+  }
+}
+"""
+
+UPLOAD_BALANCE_HISTORY_SESSION_QUERY = """
+query Web_GetUploadBalanceHistorySession($sessionKey: String!) {
+  uploadBalanceHistorySession(sessionKey: $sessionKey) {
+    sessionKey
+    status
+  }
+}
+"""
+
+# =============================================================================
 # Account Management
 #
 # Common_UpdateAccount backs every account-setting change the web UI makes:

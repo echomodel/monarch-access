@@ -522,5 +522,14 @@
         }
       }
     }
+  ],
+  "balances": [
+    {"account_id": "acc_001", "date": "2026-01-01", "balance": 5000.00},
+    {"account_id": "acc_001", "date": "2026-02-01", "balance": 5200.00},
+    {"account_id": "acc_001", "date": "2026-03-01", "balance": 5100.00},
+    {"account_id": "acc_001", "date": "2026-04-01", "balance": 5300.00},
+    {"account_id": "acc_004", "date": "2026-01-01", "balance": -2000.00},
+    {"account_id": "acc_004", "date": "2026-02-01", "balance": -2200.00},
+    {"account_id": "acc_004", "date": "2026-03-01", "balance": -2300.00}
   ]
 }

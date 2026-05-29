@@ -1,10 +1,12 @@
 """Monarch Money API client."""
 
+import json as _json
 from typing import Optional
 
 import aiohttp
 
-GRAPHQL_URL = "https://api.monarch.com/graphql"
+API_BASE = "https://api.monarch.com"
+GRAPHQL_URL = f"{API_BASE}/graphql"
 
 HEADERS = {
     "Content-Type": "application/json",
@@ -68,6 +70,56 @@ class MonarchClient:
 
                 return data.get("data", {})
 
+    def _auth_headers(self, *, content_type: Optional[str] = "json") -> dict:
+        """Build authorized headers. Pass content_type=None for multipart
+        (aiohttp sets the boundary-bearing Content-Type itself)."""
+        headers = {**HEADERS, "Authorization": f"Token {self._token}"}
+        if content_type is None:
+            headers.pop("Content-Type", None)
+        return headers
+
+    async def _download_balances(self, account_ids: list[str]) -> str:
+        """POST /download-balances/ and return the CSV body (Date,Balance,Account)."""
+        if not self._token:
+            raise AuthenticationError("No Monarch token configured.")
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{API_BASE}/download-balances/",
+                json={"account_ids": account_ids},
+                headers=self._auth_headers(),
+            ) as resp:
+                text = await resp.text()
+                if resp.status == 401:
+                    raise AuthenticationError("Invalid or expired token")
+                if resp.status != 200:
+                    raise APIError(f"HTTP {resp.status}: {text[:200]}")
+                return text
+
+    async def _upload_balances(self, csv_text: str, account_id: str, filename: str) -> dict:
+        """POST a balance-history CSV to /account-balance-history/upload/.
+
+        Returns the upload response, including the session_key used to finalize
+        processing via the parse mutation + session poll.
+        """
+        if not self._token:
+            raise AuthenticationError("No Monarch token configured.")
+        form = aiohttp.FormData()
+        form.add_field("files", csv_text.encode(), filename=filename, content_type="text/csv")
+        form.add_field("account_files_mapping", _json.dumps({filename: account_id}))
+        form.add_field("files_column_mapping", _json.dumps({filename: {"date": 0, "balance": 1}}))
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{API_BASE}/account-balance-history/upload/",
+                data=form,
+                headers=self._auth_headers(content_type=None),
+            ) as resp:
+                if resp.status == 401:
+                    raise AuthenticationError("Invalid or expired token")
+                if resp.status not in (200, 201):
+                    text = await resp.text()
+                    raise APIError(f"HTTP {resp.status}: {text[:200]}")
+                return await resp.json()
+
 
 class MonarchSDK:
     """Stateless facade for MCP tools — classmethods that get the client
@@ -126,6 +178,19 @@ class MonarchSDK:
         client = cls._client()
         items = await holdings.get_holdings(client, account_ids=account_ids, as_of_date=as_of_date)
         return {"holdings": items, "count": len(items)}
+
+    @classmethod
+    async def download_balance_history(cls, account_id: str) -> dict:
+        from . import balances
+        client = cls._client()
+        snapshots = await balances.download_balance_history(client, account_id)
+        return {"account_id": account_id, "snapshots": snapshots, "count": len(snapshots)}
+
+    @classmethod
+    async def upload_balance_history(cls, account_id: str, snapshots: list[dict]) -> dict:
+        from . import balances
+        client = cls._client()
+        return await balances.upload_balance_history(client, account_id, snapshots)
 
     @classmethod
     async def get_transactions(cls, **kwargs) -> dict:

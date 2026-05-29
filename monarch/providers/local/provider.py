@@ -21,6 +21,7 @@ class LocalProvider:
         self._recurring = self._db.table("recurring")
         self._rules = self._db.table("rules")
         self._holdings = self._db.table("holdings")
+        self._balances = self._db.table("balances")
 
     def get_transactions(
         self,
@@ -178,6 +179,41 @@ class LocalProvider:
     def get_categories(self) -> list[dict]:
         """Get all transaction categories."""
         return self._categories.all()
+
+    def download_balance_history(self, account_id: str) -> list[dict]:
+        """Download daily balance snapshots for an account, sorted by date."""
+        Bal = Query()
+        rows = self._balances.search(Bal.account_id == account_id)
+        rows.sort(key=lambda r: r.get("date", ""))
+        return [{"date": r["date"], "balance": r["balance"]} for r in rows]
+
+    def upload_balance_history(self, account_id: str, snapshots: list[dict]) -> dict:
+        """Replace an account's balance history; update currentBalance to the
+        final row. Returns the prior snapshots under previous_snapshots."""
+        previous = self.download_balance_history(account_id)
+
+        Bal = Query()
+        self._balances.remove(Bal.account_id == account_id)
+        for s in snapshots:
+            self._balances.insert({
+                "account_id": account_id,
+                "date": s["date"],
+                "balance": float(s["balance"]),
+            })
+
+        if snapshots:
+            last = max(snapshots, key=lambda s: s["date"])
+            Acct = Query()
+            self._accounts.update(
+                {"currentBalance": float(last["balance"])}, Acct.id == account_id
+            )
+
+        return {
+            "success": True,
+            "status": "completed",
+            "uploaded_count": len(snapshots),
+            "previous_snapshots": previous,
+        }
 
     def get_holdings(
         self,

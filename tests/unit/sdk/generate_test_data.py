@@ -163,6 +163,13 @@ def generate_test_data(output_path: Path = None) -> dict:
         for holding in holdings_seeds:
             holdings_table.insert(holding)
 
+    # Insert balance-history snapshots as-is from seed.
+    balances_seeds = seed.get("balances", [])
+    if balances_seeds:
+        balances_table = db.table("balances")
+        for snapshot in balances_seeds:
+            balances_table.insert(snapshot)
+
     db.close()
 
     print(f"Generated {total_txn_count} transactions across {len(seed['accounts'])} accounts")

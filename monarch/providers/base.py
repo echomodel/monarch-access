@@ -139,6 +139,33 @@ class HoldingsProvider(Protocol):
 
 
 @runtime_checkable
-class Provider(TransactionsProvider, AccountsProvider, CategoriesProvider, RecurringProvider, HoldingsProvider, Protocol):
+class BalancesProvider(Protocol):
+    """Interface for account balance history operations."""
+
+    def download_balance_history(self, account_id: str) -> list[dict]:
+        """Download daily balance snapshots for an account.
+
+        Returns a list of {"date": str, "balance": float}.
+        """
+        ...
+
+    def upload_balance_history(self, account_id: str, snapshots: list[dict]) -> dict:
+        """Replace an account's entire balance history with the given snapshots.
+
+        Returns {success, status, uploaded_count, previous_snapshots, ...}.
+        """
+        ...
+
+
+@runtime_checkable
+class Provider(
+    TransactionsProvider,
+    AccountsProvider,
+    CategoriesProvider,
+    RecurringProvider,
+    HoldingsProvider,
+    BalancesProvider,
+    Protocol,
+):
     """Combined provider interface for all operations."""
     pass

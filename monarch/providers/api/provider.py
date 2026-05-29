@@ -270,6 +270,22 @@ class APIProvider:
         data = await self._client._request(TRANSACTION_CATEGORIES_QUERY)
         return data.get("categories", [])
 
+    def download_balance_history(self, account_id: str) -> list[dict]:
+        """Download daily balance snapshots for an account."""
+        return self._run(self._download_balance_history(account_id))
+
+    async def _download_balance_history(self, account_id: str) -> list[dict]:
+        from ...balances import download_balance_history
+        return await download_balance_history(self._client, account_id)
+
+    def upload_balance_history(self, account_id: str, snapshots: list[dict]) -> dict:
+        """Replace an account's balance history with the given snapshots."""
+        return self._run(self._upload_balance_history(account_id, snapshots))
+
+    async def _upload_balance_history(self, account_id: str, snapshots: list[dict]) -> dict:
+        from ...balances import upload_balance_history
+        return await upload_balance_history(self._client, account_id, snapshots)
+
     def get_holdings(
         self,
         account_ids: Optional[list[str]] = None,
