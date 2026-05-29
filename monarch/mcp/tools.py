@@ -48,6 +48,36 @@ async def list_categories() -> dict[str, Any]:
         return {"error": str(e), "categories": [], "count": 0}
 
 
+async def get_holdings(
+    account_ids: Optional[list[str]] = None,
+    as_of_date: Optional[str] = None,
+) -> dict[str, Any]:
+    """Get security-level investment holdings from Monarch Money.
+
+    Returns the positions held inside brokerage/investment accounts — the
+    share-level detail that account balances alone don't expose. Each holding
+    includes: ticker, name, type, quantity (shares), closing_price,
+    current_value, cost_basis, is_manual, day change, and tax_lots (a list of
+    {acquisition_quantity, cost_basis_per_unit} per acquisition lot).
+
+    cost_basis may be null for synced positions where the data provider did
+    not supply basis.
+
+    Args:
+        account_ids: Investment account IDs to filter by. Get IDs from
+            list_accounts. Omit for the whole portfolio's aggregated holdings.
+        as_of_date: YYYY-MM-DD. Returns the holdings snapshot as of that date,
+            enabling historical position lookups. Defaults to today.
+    """
+    try:
+        return await sdk.get_holdings(account_ids=account_ids, as_of_date=as_of_date)
+    except AuthenticationError as e:
+        return {"error": str(e), "holdings": [], "count": 0}
+    except Exception as e:
+        logger.error(f"Error getting holdings: {e}")
+        return {"error": str(e), "holdings": [], "count": 0}
+
+
 async def list_transactions(
     limit: int = 100,
     start_date: Optional[str] = None,

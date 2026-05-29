@@ -94,6 +94,13 @@ class MonarchSDK:
         return {"categories": cats, "count": len(cats)}
 
     @classmethod
+    async def get_holdings(cls, account_ids: Optional[list[str]] = None, as_of_date: Optional[str] = None) -> dict:
+        from . import holdings
+        client = cls._client()
+        items = await holdings.get_holdings(client, account_ids=account_ids, as_of_date=as_of_date)
+        return {"holdings": items, "count": len(items)}
+
+    @classmethod
     async def get_transactions(cls, **kwargs) -> dict:
         from .transactions.list import get_transactions
         client = cls._client()

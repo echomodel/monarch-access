@@ -234,6 +234,22 @@ class APIProvider:
         data = await self._client._request(TRANSACTION_CATEGORIES_QUERY)
         return data.get("categories", [])
 
+    def get_holdings(
+        self,
+        account_ids: Optional[list[str]] = None,
+        as_of_date: Optional[str] = None,
+    ) -> list[dict]:
+        """Get security-level holdings for investment accounts."""
+        return self._run(self._get_holdings(account_ids, as_of_date))
+
+    async def _get_holdings(
+        self,
+        account_ids: Optional[list[str]],
+        as_of_date: Optional[str],
+    ) -> list[dict]:
+        from ...holdings import get_holdings
+        return await get_holdings(self._client, account_ids=account_ids, as_of_date=as_of_date)
+
     def split_transaction(
         self,
         transaction_id: str,

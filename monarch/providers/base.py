@@ -109,6 +109,24 @@ class RecurringProvider(Protocol):
 
 
 @runtime_checkable
-class Provider(TransactionsProvider, AccountsProvider, CategoriesProvider, RecurringProvider, Protocol):
+class HoldingsProvider(Protocol):
+    """Interface for investment holdings operations."""
+
+    def get_holdings(
+        self,
+        account_ids: Optional[list[str]] = None,
+        as_of_date: Optional[str] = None,
+    ) -> list[dict]:
+        """Get security-level holdings for investment accounts.
+
+        Pass account_ids to filter to specific accounts, or None for the
+        whole portfolio. as_of_date (YYYY-MM-DD) queries a historical
+        snapshot; None means today.
+        """
+        ...
+
+
+@runtime_checkable
+class Provider(TransactionsProvider, AccountsProvider, CategoriesProvider, RecurringProvider, HoldingsProvider, Protocol):
     """Combined provider interface for all operations."""
     pass

@@ -181,6 +181,26 @@ monarch net-worth --format csv
 
 Shows assets and liabilities grouped by category with totals.
 
+### Investment Holdings
+
+```bash
+# All holdings across investment accounts
+monarch holdings
+
+# Holdings in a single account
+monarch holdings --account <account_id>
+
+# Holdings as of a past date (historical snapshot)
+monarch holdings --date 2025-01-15
+
+monarch holdings --format json
+monarch holdings --format csv
+```
+
+Returns security-level positions — ticker, share quantity, closing price,
+current value, cost basis, and per-acquisition tax lots. `cost_basis` may be
+null for synced positions where the data provider did not supply basis.
+
 ## Python SDK Usage
 
 ```python
@@ -250,6 +270,7 @@ gemini mcp add monarch -- monarch-mcp stdio --user local
 | Tool | Description |
 |------|-------------|
 | `list_accounts` | Get all accounts with balances |
+| `get_holdings` | Get investment holdings (shares, cost basis, tax lots) |
 | `list_categories` | Get all transaction categories |
 | `list_transactions` | Query transactions with filters |
 | `get_transaction` | Get a single transaction |

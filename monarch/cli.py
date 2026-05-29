@@ -629,6 +629,39 @@ def _list_categories(output_format: str) -> str:
         return "\n".join(lines)
 
 
+@cli.command("holdings")
+@click.option("--account", help="Filter by investment account ID")
+@click.option("--date", "as_of_date", help="Holdings as of this date (YYYY-MM-DD); defaults to today")
+@click.option("--format", "output_format", type=click.Choice(["text", "json", "csv"]), default="text", help="Output format")
+def holdings_cmd(account: Optional[str], as_of_date: Optional[str], output_format: str):
+    """List investment holdings (securities, share quantities, cost basis)."""
+    try:
+        result = _holdings(account, as_of_date, output_format)
+        click.echo(result)
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+
+
+def _holdings(account: Optional[str], as_of_date: Optional[str], output_format: str) -> str:
+    """Implementation of holdings."""
+    from . import holdings as holdings_mod
+
+    provider = get_provider()
+    account_ids = [account] if account else None
+    items = provider.get_holdings(account_ids=account_ids, as_of_date=as_of_date)
+
+    if output_format == "json":
+        return json.dumps(items, indent=2, default=str)
+    elif output_format == "csv":
+        return holdings_mod.format_csv(items)
+    else:
+        return holdings_mod.format_text(items)
+
+
 @cli.command("net-worth")
 @click.option("--format", "output_format", type=click.Choice(["text", "json", "csv"]), default="text", help="Output format")
 def net_worth_cmd(output_format: str):

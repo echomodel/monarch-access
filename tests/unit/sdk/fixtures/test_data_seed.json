@@ -349,5 +349,178 @@
       "category": {"id": "cat_006", "name": "Entertainment"},
       "account": {"id": "acc_004", "displayName": "Platinum Card", "logoUrl": null}
     }
+  ],
+  "holdings": [
+    {
+      "account_id": "acc_009",
+      "as_of_date": null,
+      "node": {
+        "id": "agg_aapl",
+        "quantity": 50,
+        "costBasis": 7500.00,
+        "totalValue": 9550.00,
+        "securityPriceChangeDollars": 25.00,
+        "securityPriceChangePercent": 0.262,
+        "lastSyncedAt": "2026-05-29T10:00:00Z",
+        "holdings": [
+          {
+            "id": "h_aapl_1",
+            "type": "equity",
+            "typeDisplay": "Equity",
+            "name": "Apple Inc.",
+            "ticker": "AAPL",
+            "closingPrice": 190.00,
+            "isManual": false,
+            "closingPriceUpdatedAt": "2026-05-28T20:00:00Z",
+            "costBasis": 7500.00,
+            "userCostBasis": null,
+            "quantity": 50,
+            "taxLots": [
+              {"id": "lot_aapl_1", "acquisitionQuantity": 30, "costBasisPerUnit": 140.00},
+              {"id": "lot_aapl_2", "acquisitionQuantity": 20, "costBasisPerUnit": 165.00}
+            ]
+          }
+        ],
+        "security": {
+          "id": "sec_aapl",
+          "name": "Apple Inc.",
+          "type": "equity",
+          "ticker": "AAPL",
+          "typeDisplay": "Equity",
+          "currentPrice": 191.00,
+          "currentPriceUpdatedAt": "2026-05-29T09:55:00Z",
+          "closingPrice": 190.00,
+          "oneDayChangePercent": 0.262,
+          "oneDayChangeDollars": 25.00
+        }
+      }
+    },
+    {
+      "account_id": "acc_009",
+      "as_of_date": null,
+      "node": {
+        "id": "agg_btc",
+        "quantity": 0.5,
+        "costBasis": null,
+        "totalValue": 32000.00,
+        "securityPriceChangeDollars": 500.00,
+        "securityPriceChangePercent": 1.58,
+        "lastSyncedAt": "2026-05-29T10:00:00Z",
+        "holdings": [
+          {
+            "id": "h_btc_1",
+            "type": "cryptocurrency",
+            "typeDisplay": "Cryptocurrency",
+            "name": "Bitcoin",
+            "ticker": "BTC",
+            "closingPrice": 64000.00,
+            "isManual": false,
+            "closingPriceUpdatedAt": "2026-05-28T20:00:00Z",
+            "costBasis": null,
+            "userCostBasis": null,
+            "quantity": 0.5,
+            "taxLots": []
+          }
+        ],
+        "security": {
+          "id": "sec_btc",
+          "name": "Bitcoin",
+          "type": "cryptocurrency",
+          "ticker": "BTC",
+          "typeDisplay": "Cryptocurrency",
+          "currentPrice": 64100.00,
+          "currentPriceUpdatedAt": "2026-05-29T09:55:00Z",
+          "closingPrice": 64000.00,
+          "oneDayChangePercent": 1.58,
+          "oneDayChangeDollars": 500.00
+        }
+      }
+    },
+    {
+      "account_id": "acc_011",
+      "as_of_date": null,
+      "node": {
+        "id": "agg_vfiax",
+        "quantity": 100,
+        "costBasis": 7500.00,
+        "totalValue": 9000.00,
+        "securityPriceChangeDollars": 0,
+        "securityPriceChangePercent": 0,
+        "lastSyncedAt": "2026-05-29T10:00:00Z",
+        "holdings": [
+          {
+            "id": "h_vfiax_1",
+            "type": "mutual_fund",
+            "typeDisplay": "Mutual Fund",
+            "name": "Vanguard 500 Index Fund Admiral Shares",
+            "ticker": "VFIAX",
+            "closingPrice": 90.00,
+            "isManual": true,
+            "closingPriceUpdatedAt": "2026-05-28T20:00:00Z",
+            "costBasis": 7500.00,
+            "userCostBasis": 7500.00,
+            "quantity": 100,
+            "taxLots": [
+              {"id": "lot_vfiax_1", "acquisitionQuantity": 100, "costBasisPerUnit": 75.00}
+            ]
+          }
+        ],
+        "security": {
+          "id": "sec_vfiax",
+          "name": "Vanguard 500 Index Fund Admiral Shares",
+          "type": "mutual_fund",
+          "ticker": "VFIAX",
+          "typeDisplay": "Mutual Fund",
+          "currentPrice": 90.00,
+          "currentPriceUpdatedAt": "2026-05-29T09:55:00Z",
+          "closingPrice": 90.00,
+          "oneDayChangePercent": 0,
+          "oneDayChangeDollars": 0
+        }
+      }
+    },
+    {
+      "account_id": "acc_009",
+      "as_of_date": "2025-01-15",
+      "node": {
+        "id": "agg_aapl",
+        "quantity": 30,
+        "costBasis": 4200.00,
+        "totalValue": 5400.00,
+        "securityPriceChangeDollars": 10.00,
+        "securityPriceChangePercent": 0.18,
+        "lastSyncedAt": "2025-01-15T10:00:00Z",
+        "holdings": [
+          {
+            "id": "h_aapl_1",
+            "type": "equity",
+            "typeDisplay": "Equity",
+            "name": "Apple Inc.",
+            "ticker": "AAPL",
+            "closingPrice": 180.00,
+            "isManual": false,
+            "closingPriceUpdatedAt": "2025-01-14T20:00:00Z",
+            "costBasis": 4200.00,
+            "userCostBasis": null,
+            "quantity": 30,
+            "taxLots": [
+              {"id": "lot_aapl_1", "acquisitionQuantity": 30, "costBasisPerUnit": 140.00}
+            ]
+          }
+        ],
+        "security": {
+          "id": "sec_aapl",
+          "name": "Apple Inc.",
+          "type": "equity",
+          "ticker": "AAPL",
+          "typeDisplay": "Equity",
+          "currentPrice": 180.00,
+          "currentPriceUpdatedAt": "2025-01-15T09:55:00Z",
+          "closingPrice": 180.00,
+          "oneDayChangePercent": 0.18,
+          "oneDayChangeDollars": 10.00
+        }
+      }
+    }
   ]
 }

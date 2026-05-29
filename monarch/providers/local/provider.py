@@ -18,6 +18,7 @@ class LocalProvider:
         self._categories = self._db.table("categories")
         self._recurring = self._db.table("recurring")
         self._rules = self._db.table("rules")
+        self._holdings = self._db.table("holdings")
 
     def get_transactions(
         self,
@@ -131,6 +132,31 @@ class LocalProvider:
     def get_categories(self) -> list[dict]:
         """Get all transaction categories."""
         return self._categories.all()
+
+    def get_holdings(
+        self,
+        account_ids: Optional[list[str]] = None,
+        as_of_date: Optional[str] = None,
+    ) -> list[dict]:
+        """Get security-level holdings for investment accounts.
+
+        Local entries wrap a raw Monarch `aggregateHoldings` node under
+        {"account_id", "as_of_date", "node"} so the stored `node` stays a
+        faithful copy of the API response shape. Entries with as_of_date null
+        are the current snapshot; entries with a date are historical snapshots
+        returned only when that date is requested.
+        """
+        from ...holdings import normalize_holding
+
+        entries = self._holdings.all()
+        if as_of_date is None:
+            entries = [e for e in entries if not e.get("as_of_date")]
+        else:
+            entries = [e for e in entries if e.get("as_of_date") == as_of_date]
+        if account_ids:
+            entries = [e for e in entries if e.get("account_id") in account_ids]
+
+        return [normalize_holding(e["node"]) for e in entries]
 
     def get_recurring_transaction_items(
         self,

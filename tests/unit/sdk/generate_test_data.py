@@ -155,6 +155,14 @@ def generate_test_data(output_path: Path = None) -> dict:
         for rule in rules_seeds:
             rules_table.insert(rule)
 
+    # Insert holdings as-is from seed (raw Monarch node shape, wrapped with
+    # account_id + as_of_date for local filtering).
+    holdings_seeds = seed.get("holdings", [])
+    if holdings_seeds:
+        holdings_table = db.table("holdings")
+        for holding in holdings_seeds:
+            holdings_table.insert(holding)
+
     db.close()
 
     print(f"Generated {total_txn_count} transactions across {len(seed['accounts'])} accounts")

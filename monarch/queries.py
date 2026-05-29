@@ -685,6 +685,72 @@ query Common_PreviewTransactionRule($rule: TransactionRulePreviewInput!, $offset
 }
 """
 
+# =============================================================================
+# Investment Holdings
+#
+# Web_GetHoldings is what the Monarch web app calls to render the per-account
+# holdings table. The response nests under
+# data.portfolio.aggregateHoldings.edges[].node, where each node carries:
+#   - aggregate quantity / costBasis / totalValue for the security
+#   - a `security` object (ticker, name, current/closing price, day change)
+#   - a `holdings[]` array of the underlying lots/positions, each with its own
+#     quantity / costBasis / userCostBasis / isManual and a `taxLots[]` array
+#     (acquisitionQuantity, costBasisPerUnit).
+# costBasis / userCostBasis may be null for synced positions where the provider
+# did not supply basis. The PortfolioInput date range makes holdings queryable
+# as-of a date, not just the current snapshot.
+# =============================================================================
+
+HOLDINGS_QUERY = """
+query Web_GetHoldings($input: PortfolioInput) {
+  portfolio(input: $input) {
+    aggregateHoldings {
+      edges {
+        node {
+          id
+          quantity
+          costBasis
+          totalValue
+          securityPriceChangeDollars
+          securityPriceChangePercent
+          lastSyncedAt
+          holdings {
+            id
+            type
+            typeDisplay
+            name
+            ticker
+            closingPrice
+            isManual
+            closingPriceUpdatedAt
+            costBasis
+            userCostBasis
+            quantity
+            taxLots {
+              id
+              acquisitionQuantity
+              costBasisPerUnit
+            }
+          }
+          security {
+            id
+            name
+            type
+            ticker
+            typeDisplay
+            currentPrice
+            currentPriceUpdatedAt
+            closingPrice
+            oneDayChangePercent
+            oneDayChangeDollars
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
 RECURRING_TRANSACTION_ITEMS_QUERY = """
 query Web_GetUpcomingRecurringTransactionItems($startDate: Date!, $endDate: Date!, $filters: RecurringTransactionFilter) {
   recurringTransactionItems(
