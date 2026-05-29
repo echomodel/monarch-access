@@ -3,6 +3,7 @@
 import asyncio
 from typing import Any, Optional
 
+from ...accounts import UNSET
 from ...client import MonarchClient, APIError, AuthenticationError
 from ...queries import (
     ACCOUNTS_QUERY,
@@ -225,6 +226,41 @@ class APIProvider:
     async def _get_accounts(self) -> list[dict]:
         data = await self._client._request(ACCOUNTS_QUERY)
         return data.get("accounts", [])
+
+    def update_account(
+        self,
+        account_id: str,
+        *,
+        name=UNSET,
+        deactivated_at=UNSET,
+        include_in_net_worth=UNSET,
+        hidden=UNSET,
+    ) -> dict:
+        """Update an account's settings (partial)."""
+        return self._run(self._update_account(
+            account_id, name, deactivated_at, include_in_net_worth, hidden
+        ))
+
+    async def _update_account(
+        self, account_id, name, deactivated_at, include_in_net_worth, hidden
+    ) -> dict:
+        from ...accounts import update_account
+        return await update_account(
+            self._client,
+            account_id,
+            name=name,
+            deactivated_at=deactivated_at,
+            include_in_net_worth=include_in_net_worth,
+            hidden=hidden,
+        )
+
+    def close_account(self, account_id: str, close_date: Optional[str] = None) -> dict:
+        """Close an account by setting its deactivation date."""
+        return self._run(self._close_account(account_id, close_date))
+
+    async def _close_account(self, account_id, close_date) -> dict:
+        from ...accounts import close_account
+        return await close_account(self._client, account_id, close_date=close_date)
 
     def get_categories(self) -> list[dict]:
         """Get all transaction categories."""

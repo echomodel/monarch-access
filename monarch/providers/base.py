@@ -81,6 +81,18 @@ class AccountsProvider(Protocol):
         """Get all accounts. Excludes closed/deactivated by default."""
         ...
 
+    def update_account(self, account_id: str, **kwargs) -> dict:
+        """Update an account's settings (partial). Returns the updated account.
+
+        Keyword fields: name, deactivated_at, include_in_net_worth, hidden.
+        Fields not passed are left unchanged.
+        """
+        ...
+
+    def close_account(self, account_id: str, close_date: Optional[str] = None) -> dict:
+        """Close an account (set deactivatedAt). Defaults to today."""
+        ...
+
 
 @runtime_checkable
 class CategoriesProvider(Protocol):

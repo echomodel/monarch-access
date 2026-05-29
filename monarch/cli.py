@@ -629,6 +629,97 @@ def _list_categories(output_format: str) -> str:
         return "\n".join(lines)
 
 
+@cli.group("account")
+def account_group():
+    """Manage individual accounts (close, update settings)."""
+    pass
+
+
+@account_group.command("close")
+@click.argument("account_id")
+@click.option("--date", "close_date", help="Close date (YYYY-MM-DD); defaults to today")
+def account_close(account_id: str, close_date: Optional[str]):
+    """Close an account, keeping its balance history in net worth.
+
+    Closing zeros the account's balance from the close date forward but
+    retains historical snapshots — distinct from excluding it from net worth,
+    which removes the balance retroactively. Reversible via 'account update'.
+    """
+    try:
+        provider = get_provider()
+        acct = provider.close_account(account_id, close_date=close_date)
+        click.echo(f"Closed account {account_id} (deactivatedAt={acct.get('deactivatedAt')})")
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+    except (ValueError, Exception) as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@account_group.command("update")
+@click.argument("account_id")
+@click.option("--name", help="New display name")
+@click.option("--exclude-net-worth", is_flag=True, help="Exclude from net worth (retroactive)")
+@click.option("--include-net-worth", is_flag=True, help="Re-include in net worth")
+@click.option("--hide", is_flag=True, help="Hide from the accounts list")
+@click.option("--unhide", is_flag=True, help="Unhide")
+@click.option("--reopen", is_flag=True, help="Reopen a closed account (clear deactivation date)")
+def account_update(
+    account_id: str,
+    name: Optional[str],
+    exclude_net_worth: bool,
+    include_net_worth: bool,
+    hide: bool,
+    unhide: bool,
+    reopen: bool,
+):
+    """Update an account's settings. Only specified options are changed."""
+    from .accounts import UNSET
+
+    if exclude_net_worth and include_net_worth:
+        click.echo("Cannot pass both --exclude-net-worth and --include-net-worth", err=True)
+        sys.exit(1)
+    if hide and unhide:
+        click.echo("Cannot pass both --hide and --unhide", err=True)
+        sys.exit(1)
+
+    kwargs: dict = {}
+    if name is not None:
+        kwargs["name"] = name
+    if exclude_net_worth:
+        kwargs["include_in_net_worth"] = False
+    elif include_net_worth:
+        kwargs["include_in_net_worth"] = True
+    if hide:
+        kwargs["hidden"] = True
+    elif unhide:
+        kwargs["hidden"] = False
+    if reopen:
+        kwargs["deactivated_at"] = None
+
+    if not kwargs:
+        click.echo("Provide at least one field to update", err=True)
+        sys.exit(1)
+
+    try:
+        provider = get_provider()
+        acct = provider.update_account(account_id, **kwargs)
+        click.echo(f"Updated account {account_id}: {acct.get('displayName')}")
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+    except (ValueError, Exception) as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
 @cli.command("holdings")
 @click.option("--account", help="Filter by investment account ID")
 @click.option("--date", "as_of_date", help="Holdings as of this date (YYYY-MM-DD); defaults to today")

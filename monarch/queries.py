@@ -686,6 +686,47 @@ query Common_PreviewTransactionRule($rule: TransactionRulePreviewInput!, $offset
 """
 
 # =============================================================================
+# Account Management
+#
+# Common_UpdateAccount backs every account-setting change the web UI makes:
+# closing (deactivatedAt), renaming (displayName), excluding from net worth
+# (includeInNetWorth), and hiding (isHidden). Partial update — only the input
+# fields supplied are changed.
+#
+# Close vs. exclude:
+#   - Closing sets `deactivatedAt`: the account's balance reads $0 from the
+#     close date forward, but historical balance snapshots REMAIN in net worth
+#     (no retroactive change). Reversible by clearing deactivatedAt.
+#   - Excluding sets `includeInNetWorth: false`: the balance is removed from
+#     net worth retroactively, across all of history.
+# =============================================================================
+
+UPDATE_ACCOUNT_MUTATION = """
+mutation Common_UpdateAccount($input: UpdateAccountMutationInput!) {
+  updateAccount(input: $input) {
+    account {
+      id
+      displayName
+      deactivatedAt
+      isHidden
+      includeInNetWorth
+      currentBalance
+      type { name display }
+      subtype { name display }
+    }
+    errors {
+      fieldErrors {
+        field
+        messages
+      }
+      message
+      code
+    }
+  }
+}
+"""
+
+# =============================================================================
 # Investment Holdings
 #
 # Web_GetHoldings is what the Monarch web app calls to render the per-account

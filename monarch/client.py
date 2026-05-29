@@ -94,6 +94,33 @@ class MonarchSDK:
         return {"categories": cats, "count": len(cats)}
 
     @classmethod
+    async def update_account(
+        cls,
+        account_id: str,
+        name: Optional[str] = None,
+        include_in_net_worth: Optional[bool] = None,
+        hidden: Optional[bool] = None,
+    ) -> dict:
+        from . import accounts
+        client = cls._client()
+        kwargs: dict = {}
+        if name is not None:
+            kwargs["name"] = name
+        if include_in_net_worth is not None:
+            kwargs["include_in_net_worth"] = include_in_net_worth
+        if hidden is not None:
+            kwargs["hidden"] = hidden
+        acct = await accounts.update_account(client, account_id, **kwargs)
+        return {"account": acct, "success": True}
+
+    @classmethod
+    async def close_account(cls, account_id: str, close_date: Optional[str] = None) -> dict:
+        from . import accounts
+        client = cls._client()
+        acct = await accounts.close_account(client, account_id, close_date=close_date)
+        return {"account": acct, "success": True}
+
+    @classmethod
     async def get_holdings(cls, account_ids: Optional[list[str]] = None, as_of_date: Optional[str] = None) -> dict:
         from . import holdings
         client = cls._client()

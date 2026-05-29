@@ -171,6 +171,35 @@ monarch accounts --format json
 monarch accounts --format csv
 ```
 
+### Manage Accounts
+
+```bash
+# Close an account — keeps its balance history in net worth, zeros it forward
+monarch account close <account_id>
+monarch account close <account_id> --date 2025-06-30
+
+# Reopen a closed account
+monarch account update <account_id> --reopen
+
+# Rename
+monarch account update <account_id> --name "New Name"
+
+# Exclude from / include in net worth (retroactive — removes balance from history)
+monarch account update <account_id> --exclude-net-worth
+monarch account update <account_id> --include-net-worth
+
+# Hide / unhide from the accounts list
+monarch account update <account_id> --hide
+monarch account update <account_id> --unhide
+```
+
+**Close vs. exclude.** *Closing* (`account close`) keeps the account's
+historical balance snapshots in net worth and reads $0 from the close date
+forward — the right way to retire a manual placeholder once a real account
+links, so net worth neither double-counts nor drops retroactively. *Excluding*
+(`--exclude-net-worth`) removes the balance from net worth across all of
+history. Closing is reversible with `--reopen`.
+
 ### Net Worth Report
 
 ```bash
@@ -270,6 +299,8 @@ gemini mcp add monarch -- monarch-mcp stdio --user local
 | Tool | Description |
 |------|-------------|
 | `list_accounts` | Get all accounts with balances |
+| `update_account` | Rename, exclude from net worth, or hide an account |
+| `close_account` | Close an account (keeps balance history in net worth) |
 | `get_holdings` | Get investment holdings (shares, cost basis, tax lots) |
 | `list_categories` | Get all transaction categories |
 | `list_transactions` | Query transactions with filters |

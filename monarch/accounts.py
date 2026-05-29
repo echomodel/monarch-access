@@ -2,8 +2,14 @@
 
 import csv
 import io
+from datetime import date
 
-from .queries import ACCOUNTS_QUERY
+from .queries import ACCOUNTS_QUERY, UPDATE_ACCOUNT_MUTATION
+
+# Sentinel distinguishing "field not provided" (skip it) from an explicit
+# None (set the field to null — e.g. clearing deactivatedAt to reopen an
+# account). update_account sends only the fields that differ from UNSET.
+UNSET = object()
 
 
 def is_closed(account: dict) -> bool:
@@ -18,6 +24,74 @@ async def get_accounts(client, include_closed: bool = False) -> list[dict]:
     if not include_closed:
         accounts = [a for a in accounts if not is_closed(a)]
     return accounts
+
+
+async def update_account(
+    client,
+    account_id: str,
+    *,
+    name=UNSET,
+    deactivated_at=UNSET,
+    include_in_net_worth=UNSET,
+    hidden=UNSET,
+) -> dict:
+    """Update an account's settings. Partial — only provided fields change.
+
+    Args:
+        account_id: The account to update.
+        name: New display name.
+        deactivated_at: Close date (YYYY-MM-DD) to close the account, or None
+            to reopen it. CLOSING keeps historical balance snapshots in net
+            worth and reads $0 from the close date forward; it does NOT
+            retroactively remove the account from net worth. Prefer
+            close_account() for the common case.
+        include_in_net_worth: Set False to EXCLUDE the account from net worth.
+            Unlike closing, exclusion removes the balance from net worth
+            retroactively, across all of history. Set True to include.
+        hidden: Set True to hide the account from the accounts list.
+
+    Returns the updated account.
+    """
+    from .client import APIError
+
+    input_data: dict = {"id": account_id}
+    if name is not UNSET:
+        input_data["displayName"] = name
+    if deactivated_at is not UNSET:
+        input_data["deactivatedAt"] = deactivated_at
+    if include_in_net_worth is not UNSET:
+        input_data["includeInNetWorth"] = include_in_net_worth
+    if hidden is not UNSET:
+        input_data["isHidden"] = hidden
+
+    data = await client._request(UPDATE_ACCOUNT_MUTATION, {"input": input_data})
+    result = data.get("updateAccount", {})
+    if result.get("errors"):
+        errors = result["errors"]
+        msg = errors.get("message") or str(errors.get("fieldErrors", []))
+        raise APIError(f"Update account failed: {msg}")
+    return result.get("account", {})
+
+
+async def close_account(client, account_id: str, close_date: str | None = None) -> dict:
+    """Close an account by setting its deactivation date.
+
+    Closing preserves the account's historical balance curve in net worth
+    while zeroing its balance from the close date forward — so net worth
+    neither double-counts the account going forward nor drops retroactively.
+    This is distinct from excluding the account from net worth (see
+    update_account's include_in_net_worth), which removes the balance from
+    history. Reversible: reopen with update_account(deactivated_at=None).
+
+    Args:
+        account_id: The account to close.
+        close_date: Close date (YYYY-MM-DD). Defaults to today.
+
+    Returns the updated account.
+    """
+    return await update_account(
+        client, account_id, deactivated_at=close_date or date.today().isoformat()
+    )
 
 
 def format_csv(accounts: list[dict]) -> str:

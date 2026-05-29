@@ -48,6 +48,69 @@ async def list_categories() -> dict[str, Any]:
         return {"error": str(e), "categories": [], "count": 0}
 
 
+async def update_account(
+    account_id: str,
+    name: Optional[str] = None,
+    include_in_net_worth: Optional[bool] = None,
+    hidden: Optional[bool] = None,
+) -> dict[str, Any]:
+    """Update an account's settings: rename, exclude from net worth, or hide.
+
+    Only specified fields are changed. To CLOSE an account, use close_account
+    instead — closing and excluding are different operations (see close_account).
+
+    Args:
+        account_id: The account to update. Get IDs from list_accounts.
+        name: New display name for the account.
+        include_in_net_worth: Set false to EXCLUDE the account from net worth.
+            Exclusion removes the balance from net worth retroactively across
+            all history. Set true to include it again. (To stop counting an
+            account going forward while keeping its history, close it instead.)
+        hidden: Set true to hide the account from the accounts list.
+    """
+    try:
+        return await sdk.update_account(
+            account_id,
+            name=name,
+            include_in_net_worth=include_in_net_worth,
+            hidden=hidden,
+        )
+    except (AuthenticationError, APIError) as e:
+        return {"error": str(e), "account": None, "success": False}
+    except Exception as e:
+        logger.error(f"Error updating account: {e}")
+        return {"error": str(e), "account": None, "success": False}
+
+
+async def close_account(
+    account_id: str,
+    close_date: Optional[str] = None,
+) -> dict[str, Any]:
+    """Close an account, preserving its balance history in net worth.
+
+    Closing sets the account's deactivation date: its balance reads $0 from
+    the close date forward, but its historical balance snapshots REMAIN in net
+    worth (no retroactive change). This is the right way to retire a manual
+    placeholder account once a real linked account replaces it — net worth
+    neither double-counts going forward nor drops retroactively.
+
+    This differs from excluding an account from net worth (update_account with
+    include_in_net_worth=false), which removes the balance from history
+    retroactively. Closing is reversible.
+
+    Args:
+        account_id: The account to close. Get IDs from list_accounts.
+        close_date: Close date in YYYY-MM-DD format. Defaults to today.
+    """
+    try:
+        return await sdk.close_account(account_id, close_date=close_date)
+    except (AuthenticationError, APIError) as e:
+        return {"error": str(e), "account": None, "success": False}
+    except Exception as e:
+        logger.error(f"Error closing account: {e}")
+        return {"error": str(e), "account": None, "success": False}
+
+
 async def get_holdings(
     account_ids: Optional[list[str]] = None,
     as_of_date: Optional[str] = None,

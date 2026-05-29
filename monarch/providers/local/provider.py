@@ -5,6 +5,8 @@ from typing import Optional
 
 from tinydb import TinyDB, Query
 
+from ...accounts import UNSET
+
 
 class LocalProvider:
     """Provider that uses a local JSON file as a database."""
@@ -128,6 +130,50 @@ class LocalProvider:
         if not include_closed:
             accounts = [a for a in accounts if not is_closed(a)]
         return accounts
+
+    def update_account(
+        self,
+        account_id: str,
+        *,
+        name=UNSET,
+        deactivated_at=UNSET,
+        include_in_net_worth=UNSET,
+        hidden=UNSET,
+    ) -> dict:
+        """Update an account's settings (partial). Only provided fields change.
+
+        Passing deactivated_at=None (explicit) clears the close date, reopening
+        the account; not passing it leaves it untouched.
+        """
+        Acct = Query()
+        existing = self._accounts.search(Acct.id == account_id)
+        if not existing:
+            raise ValueError(f"Account not found: {account_id}")
+
+        updates: dict = {}
+        if name is not UNSET:
+            updates["displayName"] = name
+        if deactivated_at is not UNSET:
+            updates["deactivatedAt"] = deactivated_at
+        if include_in_net_worth is not UNSET:
+            updates["includeInNetWorth"] = include_in_net_worth
+        if hidden is not UNSET:
+            updates["isHidden"] = hidden
+
+        if updates:
+            self._accounts.update(updates, Acct.id == account_id)
+        return self._accounts.search(Acct.id == account_id)[0]
+
+    def close_account(self, account_id: str, close_date: Optional[str] = None) -> dict:
+        """Close an account by setting its deactivation date (defaults to today).
+
+        Mirrors the API: the account leaves the default accounts list but its
+        record (and historical balance) is retained.
+        """
+        from datetime import date as _date
+        return self.update_account(
+            account_id, deactivated_at=close_date or _date.today().isoformat()
+        )
 
     def get_categories(self) -> list[dict]:
         """Get all transaction categories."""
