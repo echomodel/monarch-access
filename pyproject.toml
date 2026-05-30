@@ -13,7 +13,7 @@ dependencies = [
     "aiohttp>=3.8.0",
     "click>=8.0.0",
     "tinydb>=4.8.0",
-    "mcp-app @ git+https://github.com/echomodel/mcp-app.git",
+    "mcp-app @ git+https://github.com/echomodel/mcp-app.git@v0.7.0",
     "pydantic>=2.0.0",
 ]
 
