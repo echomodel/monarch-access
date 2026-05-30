@@ -1,7 +1,11 @@
-"""Live read-only integration tests for Monarch API.
+"""Live read-only integration tests for the Monarch API.
 
-These tests make real API calls and require valid credentials.
-They are automatically skipped if no token is configured.
+These tests make real API calls and require valid credentials. They are
+automatically skipped if no token is configured.
+
+They call the SDK modules directly (the same code paths the CLI and MCP tools
+use), so they verify the real GraphQL/REST round-trips end-to-end. Everything
+here is read-only — no mutations against the live account.
 
 To run:
     pytest tests/integration/
@@ -41,45 +45,40 @@ class TestLiveReads:
 
     @pytest.mark.asyncio
     async def test_list_accounts(self, client):
-        """Verify we can fetch accounts from the live API."""
-        from monarch.mcp.server import get_accounts
+        """Fetch accounts from the live API."""
+        from monarch import accounts
 
-        accounts = await get_accounts(client)
+        accts = await accounts.get_accounts(client)
 
-        assert isinstance(accounts, list)
-        assert len(accounts) > 0, "Expected at least one account"
-
-        # Verify account structure
-        account = accounts[0]
+        assert isinstance(accts, list)
+        assert len(accts) > 0, "Expected at least one account"
+        account = accts[0]
         assert "id" in account
         assert "displayName" in account
 
     @pytest.mark.asyncio
     async def test_list_categories(self, client):
-        """Verify we can fetch categories from the live API."""
-        from monarch.mcp.server import get_categories
+        """Fetch categories from the live API."""
+        from monarch import categories
 
-        categories = await get_categories(client)
+        cats = await categories.get_categories(client)
 
-        assert isinstance(categories, list)
-        assert len(categories) > 0, "Expected at least one category"
-
-        # Verify category structure
-        category = categories[0]
+        assert isinstance(cats, list)
+        assert len(cats) > 0, "Expected at least one category"
+        category = cats[0]
         assert "id" in category
         assert "name" in category
 
     @pytest.mark.asyncio
     async def test_list_transactions(self, client):
-        """Verify we can fetch transactions from the live API."""
+        """Fetch a small window of transactions from the live API."""
         from datetime import date, timedelta
-        from monarch.mcp.server import get_transactions
+        from monarch.transactions import list as txn_list
 
-        # Only fetch last 7 days, limit 3
         end = date.today()
         start = end - timedelta(days=7)
 
-        result = await get_transactions(
+        result = await txn_list.get_transactions(
             client,
             limit=3,
             start_date=start.isoformat(),
@@ -89,7 +88,43 @@ class TestLiveReads:
         assert isinstance(result, dict)
         assert "results" in result
         assert "totalCount" in result
+        assert isinstance(result["results"], list)
+        assert len(result["results"]) <= 3
 
-        transactions = result["results"]
-        assert isinstance(transactions, list)
-        assert len(transactions) <= 3
+    @pytest.mark.asyncio
+    async def test_get_holdings(self, client):
+        """Fetch investment holdings from the live API (Web_GetHoldings)."""
+        from monarch import holdings
+
+        items = await holdings.get_holdings(client)
+
+        assert isinstance(items, list)
+        # Holdings may legitimately be empty (no investment accounts), but when
+        # present each item must carry the normalized fields.
+        for h in items:
+            assert "ticker" in h
+            assert "quantity" in h
+            assert "cost_basis" in h
+            assert "tax_lots" in h
+            assert isinstance(h["tax_lots"], list)
+
+    @pytest.mark.asyncio
+    async def test_download_balance_history(self, client):
+        """Download an account's balance history and derive its token (REST)."""
+        from monarch import accounts, balances
+
+        accts = await accounts.get_accounts(client)
+        assert accts, "Expected at least one account"
+        account_id = accts[0]["id"]
+
+        snapshots = await balances.download_balance_history(client, account_id)
+        assert isinstance(snapshots, list)
+        for s in snapshots[:5]:
+            assert "date" in s
+            assert "balance" in s
+
+        # The read-before-write token is derivable from the downloaded history
+        # and is stable for the same content.
+        token = balances.history_token(snapshots)
+        assert isinstance(token, int)
+        assert balances.history_token(snapshots) == token
