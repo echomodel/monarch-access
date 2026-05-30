@@ -187,10 +187,26 @@ class LocalProvider:
         rows.sort(key=lambda r: r.get("date", ""))
         return [{"date": r["date"], "balance": r["balance"]} for r in rows]
 
-    def upload_balance_history(self, account_id: str, snapshots: list[dict]) -> dict:
+    def upload_balance_history(
+        self, account_id: str, snapshots: list[dict], expected_token: int
+    ) -> dict:
         """Replace an account's balance history; update currentBalance to the
-        final row. Returns the prior snapshots under previous_snapshots."""
+        final row. Returns the prior snapshots under previous_snapshots.
+
+        expected_token must match the digest of the current history (the
+        read-before-write interlock); a mismatch raises
+        BalanceHistoryTokenMismatch and changes nothing.
+        """
+        from ...balances import BalanceHistoryTokenMismatch, history_token
+
         previous = self.download_balance_history(account_id)
+        actual_token = history_token(previous)
+        if expected_token != actual_token:
+            raise BalanceHistoryTokenMismatch(
+                f"expected_token {expected_token} does not match the account's current "
+                f"balance-history token {actual_token}. Call download_balance_history "
+                f"for this account first, then retry. Nothing was changed."
+            )
 
         Bal = Query()
         self._balances.remove(Bal.account_id == account_id)

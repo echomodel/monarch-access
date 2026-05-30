@@ -787,11 +787,15 @@ def balances_download(account_id: str, output_path: Optional[str]):
 @balances_group.command("upload")
 @click.argument("account_id")
 @click.argument("csv_file", type=click.Path(exists=True))
-def balances_upload(account_id: str, csv_file: str):
+@click.option("-o", "--backup", "backup_path", help="Write the current (pre-upload) history to this CSV before replacing")
+@click.option("-y", "--yes", is_flag=True, help="Skip the confirmation prompt")
+def balances_upload(account_id: str, csv_file: str, backup_path: Optional[str], yes: bool):
     """Replace an account's balance history from a CSV file (Date,Balance).
 
-    This REPLACES the entire existing history and sets the account's current
-    balance to the final row. The prior history is captured before the upload.
+    This REPLACES the entire existing history (no append) and sets the account's
+    current balance to the final row. The command first reads the current
+    history, shows what will be replaced, optionally backs it up (-o), and
+    requires confirmation before overwriting.
     """
     from . import balances as balances_mod
 
@@ -801,8 +805,32 @@ def balances_upload(account_id: str, csv_file: str):
         if not snapshots:
             click.echo("No snapshots found in CSV (expected Date,Balance columns)", err=True)
             sys.exit(1)
+
         provider = get_provider()
-        result = provider.upload_balance_history(account_id, snapshots)
+
+        # Read-before-write: capture the current history and its token.
+        current = provider.download_balance_history(account_id)
+        token = balances_mod.history_token(current)
+
+        if backup_path:
+            with open(backup_path, "w", newline="") as f:
+                f.write(balances_mod.snapshots_to_csv(current))
+            click.echo(f"Backed up {len(current)} existing snapshots to {backup_path}")
+
+        if current:
+            last = max(current, key=lambda s: s["date"])
+            click.echo(
+                f"Replacing {len(current)} existing snapshots for {account_id} "
+                f"(most recent: {last['date']} = {last['balance']}) "
+                f"with {len(snapshots)} new snapshots."
+            )
+        else:
+            click.echo(f"Account {account_id} has no existing balance history; uploading {len(snapshots)} snapshots.")
+
+        if not yes:
+            click.confirm("This replaces the entire history and cannot be auto-undone. Continue?", abort=True)
+
+        result = provider.upload_balance_history(account_id, snapshots, token)
         if result.get("success"):
             click.echo(f"Uploaded {result.get('uploaded_count')} snapshots to {account_id} (status: {result.get('status')})")
         else:

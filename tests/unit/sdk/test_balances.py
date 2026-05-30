@@ -1,6 +1,19 @@
 """Tests for account balance history operations."""
 
-from monarch.balances import parse_balance_csv, snapshots_to_csv
+import pytest
+
+from monarch.balances import (
+    BalanceHistoryTokenMismatch,
+    history_token,
+    parse_balance_csv,
+    snapshots_to_csv,
+)
+
+
+def _token(provider, account_id):
+    """The current history token for an account (what a real caller would read
+    from download_balance_history before uploading)."""
+    return history_token(provider.download_balance_history(account_id))
 
 
 class TestDownloadBalanceHistory:
@@ -24,52 +37,119 @@ class TestDownloadBalanceHistory:
         assert local_provider.download_balance_history("acc_nonexistent") == []
 
 
+class TestHistoryToken:
+    """The read-before-write interlock token."""
+
+    def test_token_is_stable_for_same_history(self, local_provider):
+        a = _token(local_provider, "acc_001")
+        b = _token(local_provider, "acc_001")
+        assert a == b
+
+    def test_token_independent_of_input_order(self):
+        ordered = [
+            {"date": "2026-01-01", "balance": 1.0},
+            {"date": "2026-02-01", "balance": 2.0},
+        ]
+        shuffled = list(reversed(ordered))
+        assert history_token(ordered) == history_token(shuffled)
+
+    def test_token_changes_when_history_changes(self, local_provider):
+        before = _token(local_provider, "acc_001")
+        local_provider.upload_balance_history(
+            "acc_001", [{"date": "2026-09-01", "balance": 9.0}], before
+        )
+        after = _token(local_provider, "acc_001")
+        assert before != after
+
+    def test_empty_history_has_a_token(self):
+        # A fresh account (no history) still yields a stable token, so uploading
+        # to it still requires reading first.
+        assert isinstance(history_token([]), int)
+
+
 class TestUploadBalanceHistory:
     """Uploading replaces the entire history and updates currentBalance."""
 
     def test_upload_replaces_history(self, local_provider):
+        token = _token(local_provider, "acc_001")
         new = [
             {"date": "2026-05-01", "balance": 5500.00},
             {"date": "2026-06-01", "balance": 6000.00},
         ]
-        result = local_provider.upload_balance_history("acc_001", new)
+        result = local_provider.upload_balance_history("acc_001", new, token)
         assert result["success"] is True
         after = local_provider.download_balance_history("acc_001")
         assert [s["date"] for s in after] == ["2026-05-01", "2026-06-01"]
 
     def test_upload_updates_current_balance_to_final_row(self, local_provider):
+        token = _token(local_provider, "acc_001")
         new = [
             {"date": "2026-05-01", "balance": 5500.00},
             {"date": "2026-06-01", "balance": 6000.00},
         ]
-        local_provider.upload_balance_history("acc_001", new)
-        acct = next(
-            a for a in local_provider.get_accounts() if a["id"] == "acc_001"
-        )
+        local_provider.upload_balance_history("acc_001", new, token)
+        acct = next(a for a in local_provider.get_accounts() if a["id"] == "acc_001")
         assert acct["currentBalance"] == 6000.00
 
     def test_upload_returns_previous_snapshots_for_rollback(self, local_provider):
         before = local_provider.download_balance_history("acc_001")
+        token = history_token(before)
         result = local_provider.upload_balance_history(
-            "acc_001", [{"date": "2026-07-01", "balance": 1.0}]
+            "acc_001", [{"date": "2026-07-01", "balance": 1.0}], token
         )
         assert result["previous_snapshots"] == before
 
     def test_upload_then_rollback(self, local_provider):
         original = local_provider.download_balance_history("acc_001")
+        token = history_token(original)
         result = local_provider.upload_balance_history(
-            "acc_001", [{"date": "2026-07-01", "balance": 1.0}]
+            "acc_001", [{"date": "2026-07-01", "balance": 1.0}], token
         )
-        # Restore by uploading the captured previous snapshots back.
-        local_provider.upload_balance_history("acc_001", result["previous_snapshots"])
+        # Restore by uploading the captured previous snapshots back. The token
+        # must be re-read because the history just changed.
+        new_token = _token(local_provider, "acc_001")
+        local_provider.upload_balance_history("acc_001", result["previous_snapshots"], new_token)
         assert local_provider.download_balance_history("acc_001") == original
 
     def test_upload_reported_count(self, local_provider):
+        token = _token(local_provider, "acc_001")
         result = local_provider.upload_balance_history(
             "acc_001",
             [{"date": "2026-05-01", "balance": 1.0}, {"date": "2026-06-01", "balance": 2.0}],
+            token,
         )
         assert result["uploaded_count"] == 2
+
+
+class TestUploadTokenInterlock:
+    """The token guard: upload refuses without a matching, fresh token."""
+
+    def test_wrong_token_is_rejected(self, local_provider):
+        with pytest.raises(BalanceHistoryTokenMismatch):
+            local_provider.upload_balance_history(
+                "acc_001", [{"date": "2026-05-01", "balance": 1.0}], 999999
+            )
+
+    def test_rejected_upload_changes_nothing(self, local_provider):
+        before = local_provider.download_balance_history("acc_001")
+        with pytest.raises(BalanceHistoryTokenMismatch):
+            local_provider.upload_balance_history(
+                "acc_001", [{"date": "2026-05-01", "balance": 1.0}], 999999
+            )
+        assert local_provider.download_balance_history("acc_001") == before
+
+    def test_stale_token_is_rejected(self, local_provider):
+        """A token read before an intervening change no longer validates."""
+        stale = _token(local_provider, "acc_001")
+        # An intervening upload changes the history (and the token).
+        local_provider.upload_balance_history(
+            "acc_001", [{"date": "2026-08-01", "balance": 8.0}], stale
+        )
+        # Reusing the now-stale token must fail.
+        with pytest.raises(BalanceHistoryTokenMismatch):
+            local_provider.upload_balance_history(
+                "acc_001", [{"date": "2026-09-01", "balance": 9.0}], stale
+            )
 
 
 class TestBalanceCsv:

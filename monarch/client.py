@@ -152,6 +152,7 @@ class MonarchSDK:
         name: Optional[str] = None,
         include_in_net_worth: Optional[bool] = None,
         hidden: Optional[bool] = None,
+        reopen: bool = False,
     ) -> dict:
         from . import accounts
         client = cls._client()
@@ -162,6 +163,8 @@ class MonarchSDK:
             kwargs["include_in_net_worth"] = include_in_net_worth
         if hidden is not None:
             kwargs["hidden"] = hidden
+        if reopen:
+            kwargs["deactivated_at"] = None
         acct = await accounts.update_account(client, account_id, **kwargs)
         return {"account": acct, "success": True}
 
@@ -184,13 +187,20 @@ class MonarchSDK:
         from . import balances
         client = cls._client()
         snapshots = await balances.download_balance_history(client, account_id)
-        return {"account_id": account_id, "snapshots": snapshots, "count": len(snapshots)}
+        return {
+            "account_id": account_id,
+            "snapshots": snapshots,
+            "count": len(snapshots),
+            "history_token": balances.history_token(snapshots),
+        }
 
     @classmethod
-    async def upload_balance_history(cls, account_id: str, snapshots: list[dict]) -> dict:
+    async def upload_balance_history(
+        cls, account_id: str, snapshots: list[dict], expected_token: int
+    ) -> dict:
         from . import balances
         client = cls._client()
-        return await balances.upload_balance_history(client, account_id, snapshots)
+        return await balances.upload_balance_history(client, account_id, snapshots, expected_token)
 
     @classmethod
     async def get_transactions(cls, **kwargs) -> dict:

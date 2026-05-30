@@ -149,8 +149,13 @@ class BalancesProvider(Protocol):
         """
         ...
 
-    def upload_balance_history(self, account_id: str, snapshots: list[dict]) -> dict:
+    def upload_balance_history(
+        self, account_id: str, snapshots: list[dict], expected_token: int
+    ) -> dict:
         """Replace an account's entire balance history with the given snapshots.
+
+        expected_token must match the digest of the account's current history
+        (from download_balance_history) — a read-before-write interlock.
 
         Returns {success, status, uploaded_count, previous_snapshots, ...}.
         """

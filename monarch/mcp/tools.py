@@ -58,6 +58,11 @@ async def download_balance_history(
     balances. This is read-only — useful for auditing a balance curve or
     capturing it before an upload.
 
+    The response also includes "history_token" — a digest number of the current
+    history. You MUST pass that exact token to upload_balance_history to replace
+    this account's history; uploading without first reading here (and capturing
+    the snapshots for rollback) is blocked by design.
+
     Args:
         account_id: The account to read. Get IDs from list_accounts.
     """
@@ -73,15 +78,23 @@ async def download_balance_history(
 async def upload_balance_history(
     account_id: str,
     snapshots: list[dict],
+    expected_token: int,
 ) -> dict[str, Any]:
     """Replace an account's entire balance history with the given snapshots.
 
     WARNING: this REPLACES all existing balance snapshots for the account and
-    sets its currentBalance to the final (latest-dated) row. The prior history
-    is downloaded first and returned under "previous_snapshots" so it can be
-    restored by uploading it back. Balance history is independent of
-    transactions: this creates no transactions and does not affect
-    income/expense reports.
+    sets its currentBalance to the final (latest-dated) row. There is no append
+    mode — the snapshots you pass become the account's whole curve. Balance
+    history is independent of transactions: this creates no transactions and
+    does not affect income/expense reports.
+
+    REQUIRED read-before-write: you must first call download_balance_history for
+    this account and pass its returned "history_token" as expected_token here.
+    The upload re-reads the current history, recomputes the token, and refuses
+    (changing nothing) if it does not match — which guarantees you have captured
+    the prior history (so the replace is reversible) and that nothing changed
+    underneath you. On success, the replaced history is returned under
+    "previous_snapshots" for rollback.
 
     Use for correcting stale balances on accounts that stopped syncing,
     importing history for manual accounts, or migrating a balance curve
@@ -91,12 +104,15 @@ async def upload_balance_history(
         account_id: The account whose history to overwrite. Get IDs from
             list_accounts.
         snapshots: List of {"date": "YYYY-MM-DD", "balance": float} (negative
-            for liabilities).
+            for liabilities). This is the COMPLETE replacement history.
+        expected_token: The "history_token" from a download_balance_history call
+            on this same account, just performed. Proves you read (and captured)
+            the current history before replacing it.
     """
     try:
         if not snapshots:
             return {"success": False, "error": "No snapshots provided", "uploaded_count": 0}
-        return await sdk.upload_balance_history(account_id, snapshots)
+        return await sdk.upload_balance_history(account_id, snapshots, expected_token)
     except (AuthenticationError, APIError) as e:
         return {"error": str(e), "success": False, "uploaded_count": 0}
     except Exception as e:
@@ -109,8 +125,9 @@ async def update_account(
     name: Optional[str] = None,
     include_in_net_worth: Optional[bool] = None,
     hidden: Optional[bool] = None,
+    reopen: bool = False,
 ) -> dict[str, Any]:
-    """Update an account's settings: rename, exclude from net worth, or hide.
+    """Update an account's settings: rename, exclude from net worth, hide, or reopen.
 
     Only specified fields are changed. To CLOSE an account, use close_account
     instead — closing and excluding are different operations (see close_account).
@@ -123,6 +140,8 @@ async def update_account(
             all history. Set true to include it again. (To stop counting an
             account going forward while keeping its history, close it instead.)
         hidden: Set true to hide the account from the accounts list.
+        reopen: Set true to REOPEN a closed account — clears its deactivation
+            date, restoring it to active. This is the inverse of close_account.
     """
     try:
         return await sdk.update_account(
@@ -130,6 +149,7 @@ async def update_account(
             name=name,
             include_in_net_worth=include_in_net_worth,
             hidden=hidden,
+            reopen=reopen,
         )
     except (AuthenticationError, APIError) as e:
         return {"error": str(e), "account": None, "success": False}
@@ -152,7 +172,9 @@ async def close_account(
 
     This differs from excluding an account from net worth (update_account with
     include_in_net_worth=false), which removes the balance from history
-    retroactively. Closing is reversible.
+    retroactively. Closing is NON-DESTRUCTIVE and fully reversible: it only sets
+    a deactivation date and keeps all data. To undo, call update_account with
+    reopen=true.
 
     Args:
         account_id: The account to close. Get IDs from list_accounts.

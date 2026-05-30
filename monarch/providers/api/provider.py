@@ -278,13 +278,17 @@ class APIProvider:
         from ...balances import download_balance_history
         return await download_balance_history(self._client, account_id)
 
-    def upload_balance_history(self, account_id: str, snapshots: list[dict]) -> dict:
+    def upload_balance_history(
+        self, account_id: str, snapshots: list[dict], expected_token: int
+    ) -> dict:
         """Replace an account's balance history with the given snapshots."""
-        return self._run(self._upload_balance_history(account_id, snapshots))
+        return self._run(self._upload_balance_history(account_id, snapshots, expected_token))
 
-    async def _upload_balance_history(self, account_id: str, snapshots: list[dict]) -> dict:
+    async def _upload_balance_history(
+        self, account_id: str, snapshots: list[dict], expected_token: int
+    ) -> dict:
         from ...balances import upload_balance_history
-        return await upload_balance_history(self._client, account_id, snapshots)
+        return await upload_balance_history(self._client, account_id, snapshots, expected_token)
 
     def get_holdings(
         self,

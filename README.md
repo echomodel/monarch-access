@@ -209,15 +209,30 @@ monarch balances download <account_id> -o history.csv
 
 # Replace an account's balance history from a CSV file
 monarch balances upload <account_id> history.csv
+
+# Back up the current history before replacing, and skip the prompt
+monarch balances upload <account_id> history.csv -o backup.csv --yes
 ```
 
-**Upload replaces the entire balance history** for the account and sets its
-current balance to the final row. Balance history is independent of
-transactions — uploading creates no transactions and doesn't affect
-income/expense reports. Useful for correcting stale balances on accounts that
-stopped syncing, importing history for manual accounts, or migrating a balance
-curve between accounts. Download the existing history first if you may need to
-roll back.
+**Upload replaces the entire balance history** (there is no append mode) and
+sets the account's current balance to the final row. Balance history is
+independent of transactions — uploading creates no transactions and doesn't
+affect income/expense reports. Useful for correcting stale balances on accounts
+that stopped syncing, importing history for manual accounts, or migrating a
+balance curve between accounts.
+
+Because the replace is destructive, uploads are guarded by a **read-before-write
+interlock**:
+
+- The **CLI** reads the current history first, shows what will be replaced,
+  optionally writes it to a backup CSV (`-o`), and prompts for confirmation
+  (`--yes` to skip).
+- The **SDK and MCP tool** require an `expected_token` — a digest number of the
+  current history returned by `download_balance_history`. The upload re-reads
+  the live history, recomputes the token, and refuses (changing nothing) unless
+  it matches. This guarantees the prior history was read (so the change is
+  reversible) and that nothing changed underneath. On success, the replaced
+  history is returned under `previous_snapshots` for rollback.
 
 ### Net Worth Report
 
