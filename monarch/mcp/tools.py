@@ -362,11 +362,13 @@ async def split_transaction(
 async def create_transactions(
     transactions: list[dict],
 ) -> dict[str, Any]:
-    """Create one or more manual transactions in Monarch Money.
+    """Create one or more manually-entered transactions in Monarch Money.
 
-    Use for adding transactions to manual accounts like tracking gifts,
-    loans, or other financial events not captured by linked accounts.
-    Pass a list even for a single transaction.
+    Use for transactions a linked account's sync won't produce — tracking
+    gifts, loans, cash spending, or recording income events (e.g. equity
+    vesting) — against ANY account, manual or synced. Manually-added
+    transactions coexist with synced data and are not removed by future
+    syncs. Pass a list even for a single transaction.
 
     Each item in the list is processed independently. Partial success is
     reported: items that fail validation or the API call are returned in
@@ -377,13 +379,19 @@ async def create_transactions(
     Args:
         transactions: List of transaction inputs. Each item must include:
             - date (str): Transaction date in YYYY-MM-DD format.
-            - account_id (str): The ID of the account. Must be a manual account. Get IDs from list_accounts.
+            - account_id (str): The ID of the account — manual OR synced. Get IDs from list_accounts.
             - amount (float): Transaction amount. Negative for expenses, positive for income.
             - merchant_name (str): Name of the merchant or payee.
             - category_id (str): Category ID. Get IDs from list_categories.
             Optional:
             - notes (str): Notes or description.
-            - update_balance (bool): Whether to update the account balance.
+            - update_balance (bool): Whether to adjust the account's balance.
+              Defaults to False — the OPPOSITE of the Monarch web UI, where
+              the balance-adjust toggle is on by default. Leave False to
+              record an audit-trail or income entry that does NOT change the
+              balance (e.g. income booked against a synced account whose
+              balance the sync already maintains); pass True to move the
+              balance.
     """
     try:
         if not transactions:
