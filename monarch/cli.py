@@ -279,6 +279,37 @@ def _split_transaction(transaction_id: str, splits: str, output_format: str) -> 
         return "\n".join(lines)
 
 
+@transactions_group.command("attach")
+@click.argument("transaction_id")
+@click.argument("file_path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--name", "filename", default=None,
+              help="Display filename in Monarch (default: the file's base name)")
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def attach_transaction(transaction_id: str, file_path: str, filename, output_format: str):
+    """Attach a local file (receipt, check image, statement PDF) to a transaction.
+
+    Uploads the file to Monarch as a native attachment. Monarch supports
+    multiple attachments per transaction — run once per file.
+    """
+    try:
+        provider = get_provider()
+        att = provider.attach_transaction(transaction_id, file_path, filename)
+        if output_format == "json":
+            click.echo(json.dumps(att, indent=2, default=str))
+        else:
+            click.echo(
+                f"Attached '{att.get('filename')}' (id {att.get('id')}, "
+                f"{att.get('extension')}, {att.get('sizeBytes')} bytes) "
+                f"to transaction {transaction_id}"
+            )
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+
+
 @transactions_group.command("update")
 @click.argument("transaction_id")
 @click.option("--category", help="Category name to set")

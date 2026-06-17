@@ -95,6 +95,29 @@ class MonarchClient:
                     raise APIError(f"HTTP {resp.status}: {text[:200]}")
                 return text
 
+    async def cloudinary_upload(
+        self, path: str, request_params: dict, file_bytes: bytes, filename: str
+    ) -> dict:
+        """Upload a file to Cloudinary using the signed params returned by
+        ``getTransactionAttachmentUploadInfo``. This call is authorized by
+        the ``signature`` param, NOT the Monarch token — so no Monarch auth
+        header is sent. Returns Cloudinary's JSON (public_id, format, bytes,
+        secure_url, ...)."""
+        url = f"https://api.cloudinary.com{path}"
+        form = aiohttp.FormData()
+        form.add_field("file", file_bytes, filename=filename,
+                       content_type="application/octet-stream")
+        for key in ("timestamp", "folder", "signature", "api_key", "upload_preset"):
+            val = request_params.get(key)
+            if val is not None:
+                form.add_field(key, str(val))
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data=form) as resp:
+                text = await resp.text()
+                if resp.status not in (200, 201):
+                    raise APIError(f"Cloudinary HTTP {resp.status}: {text[:200]}")
+                return _json.loads(text)
+
     async def _upload_balances(self, csv_text: str, account_id: str, filename: str) -> dict:
         """POST a balance-history CSV to /account-balance-history/upload/.
 
@@ -233,6 +256,40 @@ class MonarchSDK:
             "transaction": updated,
             "success": True,
             "message": f"Transaction {transaction_id} updated successfully",
+        }
+
+    @classmethod
+    async def attach_transaction(
+        cls, transaction_id: str, file_path: Optional[str] = None,
+        content_base64: Optional[str] = None, filename: Optional[str] = None,
+    ) -> dict:
+        """Attach a file to a transaction as a native Monarch attachment.
+
+        Provide the bytes one of two ways:
+          - ``file_path``: a path the server can read (local/stdio).
+          - ``content_base64``: base64 bytes (works over any transport;
+            required when the server can't see the local filesystem).
+        ``filename`` is the display name shown in Monarch.
+        """
+        from .transactions.attach import attach_transaction_bytes, attach_transaction_file
+        client = cls._client()
+        if content_base64 is not None:
+            import base64
+            data = base64.b64decode(content_base64)
+            upload_name = filename or "attachment"
+            attachment = await attach_transaction_bytes(
+                client, transaction_id, data, upload_name, filename
+            )
+        elif file_path is not None:
+            attachment = await attach_transaction_file(
+                client, transaction_id, file_path, filename
+            )
+        else:
+            return {"success": False, "error": "Provide file_path or content_base64."}
+        return {
+            "attachment": attachment,
+            "success": True,
+            "message": f"Attached '{attachment.get('filename')}' to transaction {transaction_id}",
         }
 
     @classmethod

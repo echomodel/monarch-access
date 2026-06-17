@@ -111,6 +111,19 @@ class APIProvider:
         data = await self._client._request(GET_TRANSACTION_QUERY, {"id": transaction_id})
         return data.get("getTransaction")
 
+    def attach_transaction(
+        self,
+        transaction_id: str,
+        file_path: str,
+        filename: Optional[str] = None,
+    ) -> dict:
+        """Attach a local file (receipt, check image, PDF) to a transaction
+        as a native Monarch attachment. Returns the attachment record."""
+        from ...transactions.attach import attach_transaction_file
+        return self._run(
+            attach_transaction_file(self._client, transaction_id, file_path, filename)
+        )
+
     def update_transaction(
         self,
         transaction_id: str,

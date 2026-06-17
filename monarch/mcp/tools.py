@@ -279,6 +279,41 @@ async def get_transaction(
         return {"error": str(e), "transaction": None, "success": False}
 
 
+async def attach_transaction(
+    transaction_id: str,
+    file_path: Optional[str] = None,
+    content_base64: Optional[str] = None,
+    filename: Optional[str] = None,
+) -> dict[str, Any]:
+    """Attach a file (receipt, check image, statement PDF) to a transaction
+    as a native Monarch attachment. Monarch supports multiple attachments per
+    transaction — call once per file (e.g. check front, check back, invoice).
+
+    Provide the file one of two ways:
+      - file_path: a path the server can read (local/stdio server). Any size.
+      - content_base64: base64-encoded bytes (works over any transport;
+        required when the server cannot see the local filesystem).
+
+    Args:
+        transaction_id: The ID of the transaction to attach to.
+        file_path: Local path to the file (local/stdio server only).
+        content_base64: Base64-encoded file bytes (alternative to file_path).
+        filename: Display name shown in Monarch (default: the file's name).
+    """
+    try:
+        return await sdk.attach_transaction(
+            transaction_id,
+            file_path=file_path,
+            content_base64=content_base64,
+            filename=filename,
+        )
+    except (AuthenticationError, APIError) as e:
+        return {"error": str(e), "success": False}
+    except Exception as e:
+        logger.error(f"Error attaching to transaction: {e}")
+        return {"error": str(e), "success": False}
+
+
 async def update_transaction(
     transaction_id: str,
     category_id: Optional[str] = None,

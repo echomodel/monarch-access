@@ -686,6 +686,46 @@ query Common_PreviewTransactionRule($rule: TransactionRulePreviewInput!, $offset
 """
 
 # =============================================================================
+# Transaction attachments (native file attachments — receipts, check images)
+# Flow: getTransactionAttachmentUploadInfo -> POST file to Cloudinary ->
+#       addTransactionAttachment. Verified against the live web app.
+# =============================================================================
+GET_TRANSACTION_ATTACHMENT_UPLOAD_INFO_MUTATION = """
+mutation Common_GetTransactionAttachmentUploadInfo($transactionId: UUID!) {
+  getTransactionAttachmentUploadInfo(transactionId: $transactionId) {
+    info {
+      path
+      requestParams {
+        timestamp
+        folder
+        signature
+        api_key
+        upload_preset
+      }
+    }
+  }
+}
+"""
+
+ADD_TRANSACTION_ATTACHMENT_MUTATION = """
+mutation Common_AddTransactionAttachment($input: TransactionAddAttachmentMutationInput!) {
+  addTransactionAttachment(input: $input) {
+    attachment {
+      id
+      publicId
+      extension
+      sizeBytes
+      filename
+      originalAssetUrl
+    }
+    errors {
+      message
+    }
+  }
+}
+"""
+
+# =============================================================================
 # Balance History Upload
 #
 # Balance history download/upload uses REST endpoints (see client._download_balances

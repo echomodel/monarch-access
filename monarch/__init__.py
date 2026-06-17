@@ -6,7 +6,7 @@ from . import net_worth
 from . import transactions
 
 __all__ = ["MonarchClient", "accounts", "net_worth", "transactions", "app"]
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 # --- mcp-app integration ---
 
