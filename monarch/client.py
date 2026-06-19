@@ -260,32 +260,32 @@ class MonarchSDK:
 
     @classmethod
     async def attach_transaction(
-        cls, transaction_id: str, file_path: Optional[str] = None,
-        content_base64: Optional[str] = None, filename: Optional[str] = None,
+        cls, transaction_id: str, content_base64: Optional[str] = None,
+        filename: Optional[str] = None,
     ) -> dict:
         """Attach a file to a transaction as a native Monarch attachment.
 
-        Provide the bytes one of two ways:
-          - ``file_path``: a path the server can read (local/stdio).
-          - ``content_base64``: base64 bytes (works over any transport;
-            required when the server can't see the local filesystem).
-        ``filename`` is the display name shown in Monarch.
+        The file is supplied as base64-encoded bytes (``content_base64``).
+        This MCP-facing facade intentionally does NOT accept a server-side
+        file path: over HTTP the server is multi-tenant, and reading an
+        arbitrary server path would expose other users' data and process
+        secrets. Local-file-by-path attachment lives in the CLI / provider
+        layer, which runs as the local user. ``filename`` is the display name
+        shown in Monarch.
         """
-        from .transactions.attach import attach_transaction_bytes, attach_transaction_file
+        if content_base64 is None:
+            return {"success": False, "error": "content_base64 is required."}
+        import base64
+        from .transactions.attach import attach_transaction_bytes
+        try:
+            data = base64.b64decode(content_base64, validate=True)
+        except Exception:
+            return {"success": False, "error": "content_base64 is not valid base64."}
         client = cls._client()
-        if content_base64 is not None:
-            import base64
-            data = base64.b64decode(content_base64)
-            upload_name = filename or "attachment"
-            attachment = await attach_transaction_bytes(
-                client, transaction_id, data, upload_name, filename
-            )
-        elif file_path is not None:
-            attachment = await attach_transaction_file(
-                client, transaction_id, file_path, filename
-            )
-        else:
-            return {"success": False, "error": "Provide file_path or content_base64."}
+        upload_name = filename or "attachment"
+        attachment = await attach_transaction_bytes(
+            client, transaction_id, data, upload_name, filename
+        )
         return {
             "attachment": attachment,
             "success": True,

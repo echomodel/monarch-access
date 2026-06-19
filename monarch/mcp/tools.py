@@ -281,29 +281,33 @@ async def get_transaction(
 
 async def attach_transaction(
     transaction_id: str,
-    file_path: Optional[str] = None,
-    content_base64: Optional[str] = None,
+    content_base64: str,
     filename: Optional[str] = None,
 ) -> dict[str, Any]:
     """Attach a file (receipt, check image, statement PDF) to a transaction
     as a native Monarch attachment. Monarch supports multiple attachments per
     transaction — call once per file (e.g. check front, check back, invoice).
 
-    Provide the file one of two ways:
-      - file_path: a path the server can read (local/stdio server). Any size.
-      - content_base64: base64-encoded bytes (works over any transport;
-        required when the server cannot see the local filesystem).
+    The file is provided as base64-encoded bytes (content_base64).
+
+    SECURITY — this tool deliberately does NOT accept a server-side file
+    path. When this server runs over HTTP it is multi-tenant and reachable by
+    untrusted callers; reading an arbitrary path off the server's filesystem
+    would let a caller exfiltrate other users' data and process secrets (e.g.
+    /proc/self/environ, the user data volume). The MCP surface therefore only
+    accepts caller-supplied bytes. To attach a local file by path, use the
+    `monarch transactions attach <transaction_id> <file_path>` CLI, which runs
+    as you on your own machine where reading your own files is not a privilege
+    escalation.
 
     Args:
         transaction_id: The ID of the transaction to attach to.
-        file_path: Local path to the file (local/stdio server only).
-        content_base64: Base64-encoded file bytes (alternative to file_path).
-        filename: Display name shown in Monarch (default: the file's name).
+        content_base64: Base64-encoded file bytes.
+        filename: Display name shown in Monarch (default: "attachment").
     """
     try:
         return await sdk.attach_transaction(
             transaction_id,
-            file_path=file_path,
             content_base64=content_base64,
             filename=filename,
         )

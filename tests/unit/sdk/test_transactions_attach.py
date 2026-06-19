@@ -68,3 +68,39 @@ class TestTransactionsAttach:
         txn_id = _a_transaction_id(local_provider)
         with pytest.raises(ValueError, match="File not found"):
             local_provider.attach_transaction(txn_id, str(tmp_path / "nope.png"))
+
+
+class TestAttachSecurityBoundary:
+    """The network-exposed MCP surface must not read arbitrary server paths.
+
+    file_path is an arbitrary server-side file read. Over HTTP the server is
+    multi-tenant, so a caller could exfiltrate other users' data / process
+    secrets (/proc/self/environ, the user data volume). The MCP tool and its
+    SDK facade therefore accept ONLY caller-supplied bytes (content_base64);
+    local-path attachment lives in the CLI/provider, which runs as the user.
+    """
+
+    def test_mcp_tool_has_no_server_file_path(self):
+        import inspect
+        from monarch.mcp import tools
+
+        params = inspect.signature(tools.attach_transaction).parameters
+        assert "file_path" not in params, "MCP attach_transaction must not expose file_path"
+        assert "content_base64" in params
+
+    def test_sdk_facade_has_no_server_file_path(self):
+        import inspect
+        from monarch.client import MonarchSDK
+
+        params = inspect.signature(MonarchSDK.attach_transaction).parameters
+        assert "file_path" not in params, "MonarchSDK.attach_transaction must not expose file_path"
+        assert "content_base64" in params
+
+    def test_cli_still_supports_local_file_path(self):
+        """The CLI/provider layer keeps file_path — that runs as the local
+        user, where reading your own file is not an escalation."""
+        import inspect
+        from monarch.providers.local.provider import LocalProvider
+
+        params = inspect.signature(LocalProvider.attach_transaction).parameters
+        assert "file_path" in params
