@@ -124,6 +124,49 @@ class LocalProvider:
         # Return updated transaction
         return self._transactions.search(Txn.id == transaction_id)[0]
 
+    def attach_transaction(
+        self,
+        transaction_id: str,
+        file_path: str,
+        filename: Optional[str] = None,
+    ) -> dict:
+        """Attach a local file to a transaction.
+
+        Local twin of the API provider's attachment flow: reads the file
+        for its real size and extension, appends an attachment record to
+        the transaction's ``attachments`` list, and returns that record.
+        Multiple attachments accumulate on one transaction.
+        """
+        import os
+
+        Txn = Query()
+        found = self._transactions.search(Txn.id == transaction_id)
+        if not found:
+            raise ValueError(f"Transaction not found: {transaction_id}")
+        txn = found[0]
+
+        if not os.path.isfile(file_path):
+            raise ValueError(f"File not found: {file_path}")
+
+        size_bytes = os.path.getsize(file_path)
+        base = os.path.basename(file_path)
+        ext = os.path.splitext(base)[1].lstrip(".") or None
+        display_name = filename or os.path.splitext(base)[0]
+
+        attachments = list(txn.get("attachments") or [])
+        public_id = f"local/transaction_receipts/{transaction_id}/{len(attachments)}"
+        attachment = {
+            "id": f"{transaction_id}-att-{len(attachments)}",
+            "filename": display_name,
+            "extension": ext,
+            "sizeBytes": size_bytes,
+            "publicId": public_id,
+            "originalAssetUrl": f"local://{public_id}.{ext}" if ext else f"local://{public_id}",
+        }
+        attachments.append(attachment)
+        self._transactions.update({"attachments": attachments}, Txn.id == transaction_id)
+        return attachment
+
     def get_accounts(self, include_closed: bool = False) -> list[dict]:
         """Get all accounts. Excludes closed/deactivated by default."""
         from ...accounts import is_closed

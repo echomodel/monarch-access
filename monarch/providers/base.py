@@ -42,6 +42,20 @@ class TransactionsProvider(Protocol):
         """Update a transaction. Only provided fields are updated."""
         ...
 
+    def attach_transaction(
+        self,
+        transaction_id: str,
+        file_path: str,
+        filename: Optional[str] = None,
+    ) -> dict:
+        """Attach a local file to a transaction as a native attachment.
+
+        Returns the created attachment record (id, filename, extension,
+        sizeBytes, publicId, originalAssetUrl). Multiple attachments per
+        transaction are supported.
+        """
+        ...
+
     def bulk_update_transactions(
         self,
         transaction_ids: list[str],
