@@ -227,6 +227,7 @@ async def list_transactions(
     category_ids: Optional[list[str]] = None,
     search: Optional[str] = None,
     is_expense: Optional[bool] = None,
+    tags: Optional[list[str]] = None,
 ) -> dict[str, Any]:
     """List transactions from Monarch Money with optional filters.
 
@@ -241,6 +242,7 @@ async def list_transactions(
         category_ids: List of category IDs to filter by. Get IDs from list_categories.
         search: Search text to filter by merchant name, notes, or description.
         is_expense: Filter by amount sign, matching Monarch's rule terminology. True = negative amounts (charges, withdrawals, payments made). False = positive amounts (deposits, refunds, payments received). A refund on an expense category has a positive amount, so is_expense=false. Omit for all transactions.
+        tags: List of tag IDs to filter by — returns transactions carrying ANY of them. Get tag IDs from list_tags. E.g. to see everything tagged "agent-reviewed", call list_tags, find its id, then pass tags=[that id].
     """
     try:
         return await sdk.get_transactions(
@@ -251,6 +253,7 @@ async def list_transactions(
             category_ids=category_ids,
             search=search,
             is_expense=is_expense,
+            tags=tags,
         )
     except AuthenticationError as e:
         return {"error": str(e), "transactions": [], "count": 0, "totalCount": 0}
@@ -655,4 +658,55 @@ async def delete_rule(
         return {"error": str(e), "success": False}
     except Exception as e:
         logger.error(f"Error deleting rule: {e}")
+        return {"error": str(e), "success": False}
+
+
+async def list_tags() -> dict[str, Any]:
+    """List all transaction tags in the household (id, name, color).
+
+    Use a tag's id to filter transactions by tag via list_transactions(tags=[id]).
+    """
+    try:
+        return await sdk.list_tags()
+    except AuthenticationError as e:
+        return {"error": str(e), "tags": [], "count": 0}
+    except Exception as e:
+        logger.error(f"Error listing tags: {e}")
+        return {"error": str(e), "tags": [], "count": 0}
+
+
+async def add_transaction_tag(transaction_id: str, tag_name: str) -> dict[str, Any]:
+    """Add a tag to a transaction WITHOUT losing its existing tags.
+
+    Resolves the tag by name (creating it if it doesn't exist), then adds it to the
+    transaction's current tags — read-union-write, so it is non-destructive and
+    idempotent. Use it to mark transactions (e.g. tag everything an agent reviewed
+    with "agent-reviewed"), then later filter via list_transactions(tags=[id]).
+
+    Args:
+        transaction_id: The ID of the transaction to tag.
+        tag_name: The tag name to add (created if it doesn't exist yet).
+    """
+    try:
+        return await sdk.add_transaction_tag(transaction_id, tag_name)
+    except AuthenticationError as e:
+        return {"error": str(e), "success": False}
+    except Exception as e:
+        logger.error(f"Error adding tag: {e}")
+        return {"error": str(e), "success": False}
+
+
+async def remove_transaction_tag(transaction_id: str, tag_name: str) -> dict[str, Any]:
+    """Remove a tag from a transaction, preserving its other tags (no-op if absent).
+
+    Args:
+        transaction_id: The ID of the transaction.
+        tag_name: The tag name to remove.
+    """
+    try:
+        return await sdk.remove_transaction_tag(transaction_id, tag_name)
+    except AuthenticationError as e:
+        return {"error": str(e), "success": False}
+    except Exception as e:
+        logger.error(f"Error removing tag: {e}")
         return {"error": str(e), "success": False}

@@ -56,7 +56,7 @@ gemini mcp list
 |------|-------------|
 | `list_accounts` | Get all financial accounts with balances |
 | `list_categories` | Get all transaction categories |
-| `list_transactions` | Query transactions with filters (date, account, category, search) |
+| `list_transactions` | Query transactions with filters (date, account, category, search, tags) |
 | `get_transaction` | Get details of a single transaction |
 | `update_transaction` | Update category, merchant, notes, or review status |
 | `mark_transactions_reviewed` | Bulk mark transactions as reviewed |
@@ -66,6 +66,9 @@ gemini mcp list
 | `list_recurring` | List tracked recurring obligations (bills, subscriptions, loans) |
 | `update_recurring` | Update a recurring stream's status, amount, or frequency |
 | `mark_as_not_recurring` | Permanently remove a recurring stream (deprecated — use `update_recurring`) |
+| `list_tags` | List all transaction tags (id, name, color) |
+| `add_transaction_tag` | Add a tag to a transaction (created if missing); preserves existing tags |
+| `remove_transaction_tag` | Remove a tag from a transaction, preserving its other tags |
 
 ## Configuration
 

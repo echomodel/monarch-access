@@ -900,3 +900,53 @@ query Web_GetUpcomingRecurringTransactionItems($startDate: Date!, $endDate: Date
   }
 }
 """
+
+
+# --- Transaction tags (reverse-engineered from the Monarch web app) ---
+
+HOUSEHOLD_TAGS_QUERY = """
+query GetHouseholdTransactionTags {
+  householdTransactionTags {
+    id
+    name
+    color
+    order
+  }
+}
+"""
+
+CREATE_TRANSACTION_TAG_MUTATION = """
+mutation Common_CreateTransactionTag($input: CreateTransactionTagInput!) {
+  createTransactionTag(input: $input) {
+    tag {
+      id
+      name
+      color
+      order
+    }
+    errors {
+      message
+    }
+  }
+}
+"""
+
+# SetTransactionTags is a FULL REPLACE of a transaction's tag list — callers
+# must union/subtract against the current tags (see transactions/tags.py).
+SET_TRANSACTION_TAGS_MUTATION = """
+mutation Web_SetTransactionTags($input: SetTransactionTagsInput!) {
+  setTransactionTags(input: $input) {
+    errors {
+      message
+    }
+    transaction {
+      id
+      tags {
+        id
+        name
+        color
+      }
+    }
+  }
+}
+"""

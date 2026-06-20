@@ -57,10 +57,12 @@ class APIProvider:
         category_ids: Optional[list[str]] = None,
         search: Optional[str] = None,
         is_expense: Optional[bool] = None,
+        tags: Optional[list[str]] = None,
     ) -> dict:
         """Get transactions with optional filters."""
         return self._run(self._get_transactions(
-            limit, offset, start_date, end_date, account_ids, category_ids, search, is_expense
+            limit, offset, start_date, end_date, account_ids, category_ids,
+            search, is_expense, tags
         ))
 
     async def _get_transactions(
@@ -73,6 +75,7 @@ class APIProvider:
         category_ids: Optional[list[str]],
         search: Optional[str],
         is_expense: Optional[bool] = None,
+        tags: Optional[list[str]] = None,
     ) -> dict:
         variables: dict[str, Any] = {
             "limit": limit,
@@ -85,6 +88,8 @@ class APIProvider:
 
         if search:
             variables["filters"]["search"] = search
+        if tags:
+            variables["filters"]["tags"] = tags
         if start_date:
             variables["filters"]["startDate"] = start_date
         if end_date:
@@ -110,6 +115,21 @@ class APIProvider:
     async def _get_transaction(self, transaction_id: str) -> Optional[dict]:
         data = await self._client._request(GET_TRANSACTION_QUERY, {"id": transaction_id})
         return data.get("getTransaction")
+
+    def list_tags(self) -> list[dict]:
+        """List all household transaction tags."""
+        from ...transactions.tags import list_tags
+        return self._run(list_tags(self._client))
+
+    def add_transaction_tag(self, transaction_id: str, tag_name: str) -> dict:
+        """Add a tag to a transaction without losing existing tags (idempotent)."""
+        from ...transactions.tags import add_transaction_tag
+        return self._run(add_transaction_tag(self._client, transaction_id, tag_name))
+
+    def remove_transaction_tag(self, transaction_id: str, tag_name: str) -> dict:
+        """Remove a tag from a transaction, preserving the others (no-op if absent)."""
+        from ...transactions.tags import remove_transaction_tag
+        return self._run(remove_transaction_tag(self._client, transaction_id, tag_name))
 
     def attach_transaction(
         self,

@@ -36,6 +36,7 @@ def transactions_group():
 @click.option("--notes", help="Filter by notes content (supports * wildcards)")
 @click.option("--original-statement", "original_statement", help="Filter by original statement (supports * wildcards)")
 @click.option("--expenses/--income", "is_expense", default=None, help="Filter: --expenses for charges, --income for deposits/payments")
+@click.option("--tag", "tag", multiple=True, help="Filter by tag name (comma-separated or multiple flags)")
 @click.option("--limit", default=1000, help="Max transactions to fetch")
 def list_transactions(
     output_format: str,
@@ -47,13 +48,14 @@ def list_transactions(
     notes: Optional[str],
     original_statement: Optional[str],
     is_expense: Optional[bool],
+    tag: tuple,
     limit: int,
 ):
     """List transactions with optional filters."""
     try:
         result = _list_transactions(
             output_format, account, category, start_date, end_date,
-            merchant, notes, original_statement, is_expense, limit
+            merchant, notes, original_statement, is_expense, tag, limit
         )
         click.echo(result)
     except AuthenticationError as e:
@@ -74,6 +76,7 @@ def _list_transactions(
     notes: Optional[str],
     original_statement: Optional[str],
     is_expense: Optional[bool],
+    tag: tuple,
     limit: int,
 ) -> str:
     """Implementation of list transactions."""
@@ -105,6 +108,18 @@ def _list_transactions(
         if not category_ids:
             return json.dumps({"error": f"No categories matching: {category_names}"})
 
+    # Get tag IDs if filtering by tag name
+    tag_ids = None
+    tag_names = _parse_multi_option(tag)
+    if tag_names:
+        all_tags = provider.list_tags()
+        tag_ids = [
+            t["id"] for t in all_tags
+            if any(fnmatch.fnmatch(t["name"].lower(), name.lower()) for name in tag_names)
+        ]
+        if not tag_ids:
+            return json.dumps({"error": f"No tags matching: {tag_names}"})
+
     # Fetch transactions
     data = provider.get_transactions(
         limit=limit,
@@ -113,6 +128,7 @@ def _list_transactions(
         account_ids=account_ids,
         category_ids=category_ids,
         is_expense=is_expense,
+        tags=tag_ids,
     )
 
     txns = data.get("results", [])
@@ -1031,3 +1047,59 @@ def rules_delete(rule_id: str):
 
 if __name__ == "__main__":
     cli()
+
+
+@transactions_group.command("tags")
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def list_tags(output_format: str):
+    """List all transaction tags (id, name, color)."""
+    try:
+        provider = get_provider()
+        tags = provider.list_tags()
+        if output_format == "json":
+            click.echo(json.dumps(tags, indent=2))
+        elif not tags:
+            click.echo("No tags.")
+        else:
+            for t in tags:
+                click.echo(f"{t.get('id', ''):<24} {t.get('name', '')}")
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+
+
+@transactions_group.command("tag-add")
+@click.argument("transaction_id")
+@click.argument("tag_name")
+def tag_add(transaction_id: str, tag_name: str):
+    """Add a tag to a transaction (created if missing); preserves existing tags."""
+    try:
+        provider = get_provider()
+        provider.add_transaction_tag(transaction_id, tag_name)
+        click.echo(f"Tagged {transaction_id} with '{tag_name}'")
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
+
+
+@transactions_group.command("tag-remove")
+@click.argument("transaction_id")
+@click.argument("tag_name")
+def tag_remove(transaction_id: str, tag_name: str):
+    """Remove a tag from a transaction, preserving its other tags."""
+    try:
+        provider = get_provider()
+        provider.remove_transaction_tag(transaction_id, tag_name)
+        click.echo(f"Removed tag '{tag_name}' from {transaction_id}")
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)

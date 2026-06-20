@@ -88,13 +88,22 @@ monarch transactions list --start 2025-12-01
 monarch transactions list --start 2025-01-01 --end 2025-12-31
 
 # Filter by account (supports wildcards)
-monarch transactions list --start 2025-01-01 --account "Chase*"
+monarch transactions list --start 2025-01-01 --account "MyBank*"
 
 # Filter by category (comma-separated)
 monarch transactions list --start 2025-01-01 --category "Shopping,Groceries"
 
 # Filter by merchant (supports wildcards)
 monarch transactions list --start 2025-01-01 --merchant "*amazon*"
+
+# Filter by tag (comma-separated or repeated; combine with other filters)
+monarch transactions list --tag "agent-reviewed"
+monarch transactions list --tag "agent-reviewed" --account "MyBank*"
+
+# Manage tags (non-destructive add/remove; tag created on first use)
+monarch transactions tags
+monarch transactions tag-add <transaction_id> "agent-reviewed"
+monarch transactions tag-remove <transaction_id> "agent-reviewed"
 
 # Output as JSON or CSV
 monarch transactions list --start 2025-01-01 --format json
@@ -348,6 +357,11 @@ gemini mcp add monarch -- monarch-mcp stdio --user local
 | `delete_transactions` | Delete one or more transactions (partial success reported) |
 | `list_recurring` | List recurring obligations |
 | `update_recurring` | Update recurring stream settings |
+| `list_tags` | List all transaction tags (id, name, color) |
+| `add_transaction_tag` | Add a tag to a transaction (created if missing); preserves existing tags |
+| `remove_transaction_tag` | Remove a tag from a transaction, preserving its other tags |
+
+`list_transactions` accepts a `tags` filter (list of tag names) alongside account, category, date, and expense/income filters — so a request like *"show me every agent-reviewed transaction in a given account"* is a single call combining `tags=["agent-reviewed"]` with an account filter. Tag add/remove are non-destructive: adding a tag never drops the transaction's existing tags, and adding the same tag twice is a no-op.
 
 For detailed documentation, see **[MCP-SERVER.md](./MCP-SERVER.md)**.
 

@@ -22,6 +22,7 @@ class LocalProvider:
         self._rules = self._db.table("rules")
         self._holdings = self._db.table("holdings")
         self._balances = self._db.table("balances")
+        self._tags = self._db.table("transaction_tags")
 
     def get_transactions(
         self,
@@ -33,6 +34,7 @@ class LocalProvider:
         category_ids: Optional[list[str]] = None,
         search: Optional[str] = None,
         is_expense: Optional[bool] = None,
+        tags: Optional[list[str]] = None,
     ) -> dict:
         """Get transactions with optional filters."""
         all_txns = self._transactions.all()
@@ -48,6 +50,12 @@ class LocalProvider:
             filtered = [t for t in filtered if t.get("account", {}).get("id") in account_ids]
         if category_ids:
             filtered = [t for t in filtered if t.get("category", {}).get("id") in category_ids]
+        if tags:
+            tag_set = set(tags)
+            filtered = [
+                t for t in filtered
+                if tag_set & {tg.get("id") for tg in (t.get("tags") or [])}
+            ]
         if is_expense is not None:
             if is_expense:
                 filtered = [t for t in filtered if (t.get("amount") or 0) < 0]
@@ -123,6 +131,49 @@ class LocalProvider:
 
         # Return updated transaction
         return self._transactions.search(Txn.id == transaction_id)[0]
+
+    def list_tags(self) -> list[dict]:
+        """List all household transaction tags."""
+        return self._tags.all()
+
+    def _ensure_tag(self, name: str) -> dict:
+        for tag in self._tags.all():
+            if (tag.get("name") or "").lower() == name.lower():
+                return tag
+        tag = {"id": f"tag_{name.lower().replace(' ', '_')}", "name": name, "color": "#aaaaaa"}
+        self._tags.insert(tag)
+        return tag
+
+    def _set_tags(self, transaction_id: str, tag_ids: list[str]) -> dict:
+        Txn = Query()
+        if not self._transactions.search(Txn.id == transaction_id):
+            raise ValueError(f"Transaction not found: {transaction_id}")
+        all_tags = {t["id"]: t for t in self._tags.all()}
+        tags = [all_tags[tid] for tid in tag_ids if tid in all_tags]
+        self._transactions.update({"tags": tags}, Txn.id == transaction_id)
+        return self._transactions.search(Txn.id == transaction_id)[0]
+
+    def add_transaction_tag(self, transaction_id: str, tag_name: str) -> dict:
+        """Add a tag to a transaction without losing existing tags (idempotent)."""
+        Txn = Query()
+        found = self._transactions.search(Txn.id == transaction_id)
+        if not found:
+            raise ValueError(f"Transaction not found: {transaction_id}")
+        tag = self._ensure_tag(tag_name)
+        current = [t["id"] for t in (found[0].get("tags") or [])]
+        new_ids = list(dict.fromkeys(current + [tag["id"]]))
+        return self._set_tags(transaction_id, new_ids)
+
+    def remove_transaction_tag(self, transaction_id: str, tag_name: str) -> dict:
+        """Remove a tag from a transaction, preserving the others (no-op if absent)."""
+        Txn = Query()
+        found = self._transactions.search(Txn.id == transaction_id)
+        if not found:
+            raise ValueError(f"Transaction not found: {transaction_id}")
+        current = found[0].get("tags") or []
+        new_ids = [t["id"] for t in current
+                   if (t.get("name") or "").lower() != tag_name.lower()]
+        return self._set_tags(transaction_id, new_ids)
 
     def attach_transaction(
         self,

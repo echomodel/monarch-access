@@ -17,10 +17,13 @@ async def get_transactions(
     category_ids: Optional[list[str]] = None,
     search: Optional[str] = None,
     is_expense: Optional[bool] = None,
+    tags: Optional[list[str]] = None,
 ) -> dict:
     """Get transactions with optional filters.
 
     Args:
+        tags: list of tag IDs; returns transactions carrying ANY of them.
+            Get tag IDs from list_tags.
         is_expense: Filter by amount sign, matching Monarch's rule terminology.
             True = negative amounts (charges, withdrawals, payments made).
             False = positive amounts (deposits, refunds, payments received).
@@ -39,6 +42,8 @@ async def get_transactions(
 
     if search:
         variables["filters"]["search"] = search
+    if tags:
+        variables["filters"]["tags"] = tags
 
     # Add date filters if provided
     if start_date:

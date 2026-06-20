@@ -259,6 +259,35 @@ class MonarchSDK:
         }
 
     @classmethod
+    async def list_tags(cls) -> dict:
+        from .transactions.tags import list_tags
+        client = cls._client()
+        tags = await list_tags(client)
+        return {"tags": tags, "count": len(tags)}
+
+    @classmethod
+    async def add_transaction_tag(cls, transaction_id: str, tag_name: str) -> dict:
+        from .transactions.tags import add_transaction_tag
+        client = cls._client()
+        txn = await add_transaction_tag(client, transaction_id, tag_name)
+        return {
+            "transaction": txn,
+            "success": True,
+            "message": f"Tag '{tag_name}' added to transaction {transaction_id}",
+        }
+
+    @classmethod
+    async def remove_transaction_tag(cls, transaction_id: str, tag_name: str) -> dict:
+        from .transactions.tags import remove_transaction_tag
+        client = cls._client()
+        txn = await remove_transaction_tag(client, transaction_id, tag_name)
+        return {
+            "transaction": txn,
+            "success": True,
+            "message": f"Tag '{tag_name}' removed from transaction {transaction_id}",
+        }
+
+    @classmethod
     async def attach_transaction(
         cls, transaction_id: str, content_base64: Optional[str] = None,
         filename: Optional[str] = None,

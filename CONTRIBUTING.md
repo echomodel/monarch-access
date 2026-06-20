@@ -179,6 +179,15 @@ The `cloudinaryPublicId` from an existing merchant can be reused on other mercha
 
 Both captured in `queries.py` but not yet wired to SDK/MCP/CLI.
 
+**Transaction tags:**
+- `householdTransactionTags` query — lists all tags for the household (id, name, color, order). Used to resolve a tag name to its ID before filtering or setting.
+- `createTransactionTag(input: {name, color})` mutation — creates a tag. **A color is required**; the SDK supplies a neutral default (`#aaaaaa`) when the caller omits one. Returns the created tag's id/name/color.
+- `setTransactionTags(input: {transactionId, tagIds})` mutation — **this is a FULL REPLACE**: it sets the transaction's tag list to exactly `tagIds`, dropping any tag not in the list. There is no "add one tag" mutation.
+
+Because `setTransactionTags` is destructive, the SDK never exposes it raw for the common case. `add_transaction_tag`/`remove_transaction_tag` use a **read-union-write** pattern: read the transaction's current tag IDs, union (or subtract) the target, then `setTransactionTags` the full new list. This makes add non-destructive (existing tags preserved) and idempotent (adding a tag already present is a no-op). The pattern is **not** compare-and-set, so concurrent tag edits on the same transaction are last-writer-wins — acceptable for the single-operator personal-accounting use case; revisit if a multi-writer scenario emerges.
+
+Transactions are filtered by tag via the existing `transactions` query's `filters.tags` field (a list of tag IDs, ANY-match). Implemented in SDK/MCP/CLI via `list_tags`, `add_transaction_tag`, `remove_transaction_tag`, and the `tags` filter on `list_transactions`.
+
 ### Multi-Account Merchant Splitting
 
 When one merchant (e.g., an insurer) handles multiple policies from different accounts, transactions can be reassigned to new merchants:

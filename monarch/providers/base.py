@@ -17,11 +17,28 @@ class TransactionsProvider(Protocol):
         category_ids: Optional[list[str]] = None,
         search: Optional[str] = None,
         is_expense: Optional[bool] = None,
+        tags: Optional[list[str]] = None,
     ) -> dict:
         """Get transactions with optional filters.
 
+        tags is a list of tag IDs (transactions carrying ANY of them).
         Returns dict with 'totalCount' and 'results' keys.
         """
+        ...
+
+    def list_tags(self) -> list[dict]:
+        """List all household transaction tags (id, name, color)."""
+        ...
+
+    def add_transaction_tag(self, transaction_id: str, tag_name: str) -> dict:
+        """Add a tag to a transaction without losing existing tags. Idempotent.
+
+        Resolves or creates the tag by name. Returns the updated transaction.
+        """
+        ...
+
+    def remove_transaction_tag(self, transaction_id: str, tag_name: str) -> dict:
+        """Remove a tag from a transaction, preserving the others. No-op if absent."""
         ...
 
     def get_transaction(self, transaction_id: str) -> Optional[dict]:
