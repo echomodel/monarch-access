@@ -63,7 +63,7 @@ def safe_storage_key() -> bytes:
     if proc.returncode != 0 or not proc.stdout.strip():
         raise ChromeCookieError(
             "Keychain access to 'Chrome Safe Storage' was denied or not found. "
-            "Re-run and choose Allow (or Always Allow) when macOS asks."
+            "Re-run and choose Allow when macOS asks."
         )
     return hashlib.pbkdf2_hmac("sha1", proc.stdout.strip().encode(), b"saltysalt", 1003, 16)
 
