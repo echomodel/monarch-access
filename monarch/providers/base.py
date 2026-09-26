@@ -112,6 +112,10 @@ class AccountsProvider(Protocol):
         """Get all accounts. Excludes closed/deactivated by default."""
         ...
 
+    def count_accounts(self) -> dict:
+        """Count open accounts. Returns {"count": N} and nothing else."""
+        ...
+
     def update_account(self, account_id: str, **kwargs) -> dict:
         """Update an account's settings (partial). Returns the updated account.
 

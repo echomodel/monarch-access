@@ -33,6 +33,21 @@ async def list_accounts(include_closed: bool = False) -> dict[str, Any]:
         return {"error": str(e), "accounts": [], "count": 0}
 
 
+async def count_accounts() -> dict[str, Any]:
+    """Count the user's open Monarch Money accounts.
+
+    Returns only {"count": N}. Useful as a cheap connectivity and
+    authentication check.
+    """
+    try:
+        return await sdk.count_accounts()
+    except AuthenticationError as e:
+        return {"error": str(e), "count": 0}
+    except Exception as e:
+        logger.error(f"Error counting accounts: {e}")
+        return {"error": str(e), "count": 0}
+
+
 async def list_categories() -> dict[str, Any]:
     """List all transaction categories from Monarch Money.
 

@@ -20,12 +20,11 @@ The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standa
    pipx install git+https://github.com/krisrowe/monarch-access.git
    ```
 
-2. **Get your Monarch token** (see [README.md](./README.md#authentication))
-
-3. **Register a local user** for MCP:
+2. **Import your Monarch session** into the local store (opens a Monarch
+   sign-in in Chrome when needed; see [README.md](./README.md#authentication)):
    ```bash
    monarch-admin connect local
-   monarch-admin users add local --token $MONARCH_SESSION_TOKEN
+   monarch-admin acquire-session
    ```
 
 ### Register with Claude Code
@@ -55,6 +54,7 @@ gemini mcp list
 | Tool | Description |
 |------|-------------|
 | `list_accounts` | Get all financial accounts with balances |
+| `count_accounts` | Count open accounts (returns only a number; the admin safe tool) |
 | `list_categories` | Get all transaction categories |
 | `list_transactions` | Query transactions with filters (date, account, category, search, tags) |
 | `get_transaction` | Get details of a single transaction |
@@ -74,17 +74,15 @@ gemini mcp list
 
 ### Local (stdio)
 
-The MCP server uses mcp-app's user store. Register a local user with your Monarch token:
+The MCP server uses mcp-app's user store. `monarch-admin acquire-session`
+imports the Monarch browser session into the `local` user's profile:
 
 ```bash
 monarch-admin connect local
-monarch-admin users add local --token $MONARCH_SESSION_TOKEN
+monarch-admin acquire-session
 ```
 
-To rotate the token later:
-```bash
-monarch-admin users update-profile local token "NEW_TOKEN"
-```
+Re-run `acquire-session` to rotate an expired session.
 
 ### Cloud (HTTP)
 
@@ -92,14 +90,15 @@ See [Cloud Deployment](./README.md#cloud-deployment-optional) for deploying as a
 
 ## Troubleshooting
 
-### "Not authenticated" errors
+### "Monarch session invalid or expired" / "No Monarch session configured"
 
-Token may have expired. Get a new one:
+The stored session has expired or was never imported:
 
-1. Go to https://app.monarch.com/ and log in
-2. Open DevTools (F12) → Console
-3. Run: `JSON.parse(JSON.parse(localStorage.getItem("persist:root")).user).token`
-4. Rotate: `monarch-admin users update-profile local token $MONARCH_SESSION_TOKEN`
+Run `monarch-admin acquire-session` against each target you use
+(`monarch-admin connect local` or `connect <url> --signing-key …` first). It
+opens a Monarch sign-in in Chrome when the browser's session has expired.
+
+`monarch-admin users get-profile local` shows the stored `session_expires`.
 
 ### Server not starting
 
@@ -110,14 +109,14 @@ monarch-mcp stdio --user local
 
 If it exits with errors, check that:
 1. Dependencies are installed: `pipx reinstall monarch-access`
-2. A local user is registered: `monarch-admin connect local && monarch-admin users add local --token $MONARCH_SESSION_TOKEN`
+2. A session is imported: `monarch-admin connect local && monarch-admin acquire-session`
 
 ## Security
 
-- **Token storage**: Never commit tokens to version control
-- **Local stdio**: Runs locally under your user account; token stored in mcp-app's local user store
-- **Cloud HTTP**: Tokens stored server-side; clients authenticate with JWTs issued by `monarch-admin`
-- **Token expiration**: Monarch tokens expire periodically; rotate with `monarch-admin users update-profile`
+- **Credential storage**: Never commit session values to version control; `acquire-session` never prints them unless `--print` is given
+- **Local stdio**: Runs locally under your user account; the session is stored in mcp-app's local user store
+- **Cloud HTTP**: The session is stored server-side; clients authenticate with JWTs issued by `monarch-admin`
+- **Session expiration**: Monarch sessions expire after a fixed period; rotate with `monarch-admin acquire-session`
 
 ## Related Documentation
 

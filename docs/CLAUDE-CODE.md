@@ -3,15 +3,16 @@
 ## Prerequisites
 
 - **Monarch Access Installed:** `pipx install git+https://github.com/krisrowe/monarch-access.git`
-- **Monarch Token:** See [README.md](../README.md#authentication)
+- **Monarch session:** See [README.md](../README.md#authentication)
 - **Claude Code Installed:** [Install Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 
 ## Quick Start
 
-1. Register a local user with your Monarch session token:
+1. Import your Monarch session into the local store (opens a Monarch sign-in
+   in Chrome when needed):
    ```bash
    monarch-admin connect local
-   monarch-admin users add local --token $MONARCH_SESSION_TOKEN
+   monarch-admin acquire-session
    ```
 
 2. Add the MCP server:
@@ -105,9 +106,9 @@ claude mcp add --scope user monarch -- monarch-mcp stdio --user local
    monarch-admin users list
    ```
 
-**Token expiration:**
-- Monarch tokens expire periodically
-- Update with: `monarch-admin users add local --token "NEW_TOKEN"`
+**Session expiration:**
+- Monarch sessions expire after a fixed period
+- Run `monarch-admin acquire-session` (prompts for a sign-in if needed)
 - No MCP re-registration needed
 
 **Permission errors:**

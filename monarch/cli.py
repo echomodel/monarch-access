@@ -961,11 +961,10 @@ def _list_rules(output_format: str) -> str:
     """Implementation of list rules."""
     import asyncio
     from .rules import get_rules, format_rule
-    from .client import MonarchClient
-    from .providers.api.provider import _load_token
+    from .providers.api.provider import _load_client
 
     async def _fetch():
-        client = MonarchClient(token=_load_token())
+        client = _load_client()
         raw_rules = await get_rules(client)
         return [format_rule(r) for r in raw_rules]
 
@@ -1023,12 +1022,11 @@ def rules_delete(rule_id: str):
     """Delete a transaction rule by ID."""
     import asyncio
     from .rules import delete_rule
-    from .client import MonarchClient
-    from .providers.api.provider import _load_token
+    from .providers.api.provider import _load_client
 
     try:
         async def _delete():
-            client = MonarchClient(token=_load_token())
+            client = _load_client()
             return await delete_rule(client, rule_id)
 
         result = asyncio.run(_delete())

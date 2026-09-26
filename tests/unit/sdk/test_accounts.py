@@ -40,3 +40,12 @@ class TestAccountsList:
             assert "institution" in account
             assert "id" in account["institution"]
             assert "name" in account["institution"]
+
+
+class TestCountAccounts:
+    """count_accounts backs the admin safe tool: a bare count, nothing else."""
+
+    def test_count_accounts_matches_open_accounts(self, local_provider):
+        result = local_provider.count_accounts()
+        assert result == {"count": len(local_provider.get_accounts())}
+        assert result["count"] > 0

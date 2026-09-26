@@ -19,29 +19,24 @@ from ...queries import (
 )
 
 
-def _load_token() -> str:
-    """Load the Monarch session token from the mcp-app local user store."""
+def _load_client() -> MonarchClient:
+    """Build a client from the credentials in the mcp-app local user store."""
     from mcp_app import FileSystemUserDataStore
+    from ...client import NO_AUTH_MESSAGE
     store = FileSystemUserDataStore("monarch")
     user_data = store.load("local", "user")
     if user_data and isinstance(user_data, dict):
-        profile = user_data.get("profile") or {}
-        token = profile.get("token")
-        if token:
-            return token
-
-    raise AuthenticationError(
-        "No Monarch token configured. Set up auth with:\n"
-        "  monarch-admin connect local\n"
-        "  monarch-admin users add local --token $MONARCH_SESSION_TOKEN"
-    )
+        client = MonarchClient.from_profile(user_data.get("profile") or {})
+        if client.is_authenticated:
+            return client
+    raise AuthenticationError(NO_AUTH_MESSAGE)
 
 
 class APIProvider:
     """Provider that connects to the Monarch Money API."""
 
     def __init__(self, client: Optional[MonarchClient] = None):
-        self._client = client or MonarchClient(token=_load_token())
+        self._client = client or _load_client()
 
     def _run(self, coro):
         """Run async coroutine synchronously."""
@@ -259,6 +254,10 @@ class APIProvider:
     async def _get_accounts(self) -> list[dict]:
         data = await self._client._request(ACCOUNTS_QUERY)
         return data.get("accounts", [])
+
+    def count_accounts(self) -> dict:
+        """Count open accounts. Returns {"count": N} and nothing else."""
+        return {"count": len(self.get_accounts())}
 
     def update_account(
         self,

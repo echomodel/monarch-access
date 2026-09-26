@@ -8,6 +8,9 @@ monarch-access/
 ├── Makefile              # Development commands
 ├── monarch/              # SDK package
 │   ├── cli.py            # CLI entry point (monarch command)
+│   ├── admin.py          # monarch-admin extensions (acquire-session)
+│   ├── auth.py           # Browser-session import: read, verify, store
+│   ├── chrome_cookies.py # Reads/decrypts Chrome's cookie store (macOS)
 │   ├── client.py         # MonarchClient - auth & API requests
 │   ├── queries.py        # GraphQL queries
 │   ├── accounts.py       # Account operations & formatting
@@ -49,7 +52,7 @@ make test
 | Command | Description |
 |---------|-------------|
 | `make test` | Run unit tests (auto-creates venv, no credentials needed) |
-| `make integration-test` | Run integration tests (requires Monarch token) |
+| `make integration-test` | Run integration tests (requires a Monarch session) |
 | `make install` | Install CLI + MCP server with pipx |
 | `make clean` | Remove venv and build artifacts |
 | `make uninstall` | Remove from pipx |
@@ -58,11 +61,15 @@ make test
 
 **Unit tests** use a local provider with TinyDB - no network or auth required. Test data is auto-generated from `tests/fixtures/test_data_seed.json`.
 
-**Integration tests** hit the live Monarch API and are skipped automatically if no token is configured.
+**Integration tests** hit the live Monarch API and are skipped automatically if no session is configured (see README "Authentication").
+
+**Framework tests** (`tests/framework/`) import mcp-app's conformance suite: auth enforcement, admin, wiring, health, and a coverage audit requiring every tool's SDK method to be referenced by a unit test.
+
+**Live checks run the installed CLI.** Before trusting a stdio smoke test or `monarch-admin` run, confirm the pipx install is editable — `pipx list | grep -A5 monarch-access` must show `(editable)`; `--version` does not reveal a stale snapshot. Fix with `pipx install -e . --force`.
 
 ```bash
 make test              # Unit tests only (default)
-make integration-test  # Live API tests (requires token)
+make integration-test  # Live API tests (requires a Monarch session)
 ```
 
 ## Architecture
@@ -72,7 +79,23 @@ This project follows a CLI/MCP/SDK layered architecture:
 - **CLI layer** (`monarch/cli.py`): Thin Click wrapper
 - **MCP layer** (`monarch/mcp/tools.py`): Plain async functions registered by [mcp-app](https://github.com/echomodel/mcp-app). `MonarchSDK` in `client.py` bridges mcp-app's `current_user` context to the SDK.
 
-The `App` object in `monarch/__init__.py` wires everything: tools module, profile model, and entry points (`monarch-mcp`, `monarch-admin`).
+The `App` object in `monarch/__init__.py` wires everything: tools module, profile model, safe tool, and entry points (`monarch-mcp`, `monarch-admin`).
+
+### Profile and authentication
+
+The `Profile` model in `monarch/__init__.py` holds each user's Monarch credential: the browser session (`session_id`, `csrftoken`, `device_uuid`, `session_expires`) and an optional bearer `token` used only when no session is stored. Every field must carry a `Field(description=...)` — the descriptions drive `monarch-admin users add --help` / `update-profile --help`, which is how operators discover what a field is and how to obtain it. When adding a field, update the description, README's Authentication section, and tests.
+
+`monarch-admin acquire-session` gets the session from the everyday Chrome's cookie store (`chrome_cookies.py`: SQLite copy + AES-CBC with the "Chrome Safe Storage" Keychain key; from cookie DB version 24 the plaintext carries a 32-byte host-hash prefix) or from a remote-debugging Chrome (`--cdp`). It verifies with a `me { id }` query and opens the sign-in page only when no stored browser session verifies.
+
+`MonarchClient._auth_headers` sends the session as the web app does (cookie + `x-csrftoken` header); see its docstring for the observed header set. 401 and 403 responses raise `AuthenticationError` with the rotation instructions.
+
+### Admin CLI extensions
+
+`monarch-admin` is mcp-app's generated admin CLI. App-specific admin commands are Click commands in `monarch/admin.py`, attached in `monarch/__init__.py` with `app.admin_cli.add_command(...)`. They stay thin: the logic lives in `monarch/auth.py`, and the command resolves its target store (local or remote, per `monarch-admin connect`) through the framework's `_get_auth_store` helper so it writes where the `users` commands do.
+
+### Safe tool
+
+`count_accounts` is declared as the app's `SafeTool`, so `monarch-admin safe-tool --invoke` calls it end to end against a deployment. It returns only `{"count": N}` — keep it free of user-authored content.
 
 ## Monarch API Behaviors
 

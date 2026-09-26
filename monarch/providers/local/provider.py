@@ -226,6 +226,10 @@ class LocalProvider:
             accounts = [a for a in accounts if not is_closed(a)]
         return accounts
 
+    def count_accounts(self) -> dict:
+        """Count open accounts. Returns {"count": N} and nothing else."""
+        return {"count": len(self.get_accounts())}
+
     def update_account(
         self,
         account_id: str,

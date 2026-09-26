@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "monarch-access"
-version = "0.7.0"
+version = "0.8.0"
 description = "Lightweight CLI and Python SDK for accessing Monarch Money financial data"
 readme = "README.md"
 license = "MIT"
@@ -14,7 +14,9 @@ dependencies = [
     "click>=8.0.0",
     "tinydb>=4.8.0",
     "mcp-app @ git+https://github.com/echomodel/mcp-app.git@v0.7.0",
+    "mcp<2",  # mcp-app v0.7.0 uses the v1 FastMCP API
     "pydantic>=2.0.0",
+    "cryptography>=42",  # decrypts Chrome's cookie store (monarch-admin acquire-session)
 ]
 
 [project.optional-dependencies]

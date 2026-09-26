@@ -17,27 +17,27 @@ from monarch.client import MonarchClient
 
 
 def _has_token() -> bool:
-    """Check if a Monarch token is available in the mcp-app local user store."""
+    """Check if Monarch credentials are available in the mcp-app local user store."""
     try:
-        from monarch.providers.api.provider import _load_token
-        _load_token()
+        from monarch.providers.api.provider import _load_client
+        _load_client()
         return True
     except Exception:
         return False
 
 
-# Skip all tests in this module if no token is available
+# Skip all tests in this module if no credentials are available
 pytestmark = pytest.mark.skipif(
     not _has_token(),
-    reason="No Monarch token configured (run: monarch-admin connect local && monarch-admin users add local --token TOKEN)"
+    reason="No Monarch session configured (run: monarch-admin connect local && monarch-admin acquire-session)"
 )
 
 
 @pytest.fixture
 def client():
     """Create a MonarchClient for live API calls."""
-    from monarch.providers.api.provider import _load_token
-    return MonarchClient(token=_load_token())
+    from monarch.providers.api.provider import _load_client
+    return _load_client()
 
 
 class TestLiveReads:

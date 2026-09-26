@@ -18,6 +18,10 @@ HEADERS = {
 }
 
 
+NO_AUTH_MESSAGE = "No Monarch session configured. Run: monarch-admin acquire-session"
+EXPIRED_MESSAGE = "Monarch session invalid or expired. Run: monarch-admin acquire-session"
+
+
 class MonarchClientError(Exception):
     """Base exception for Monarch client errors."""
     pass
@@ -36,30 +40,72 @@ class APIError(MonarchClientError):
 class MonarchClient:
     """Lightweight client for Monarch Money API."""
 
-    def __init__(self, token: str):
+    def __init__(
+        self,
+        token: Optional[str] = None,
+        session_id: Optional[str] = None,
+        csrftoken: Optional[str] = None,
+        device_uuid: Optional[str] = None,
+    ):
         self._token = token
+        self._session_id = session_id
+        self._csrftoken = csrftoken
+        self._device_uuid = device_uuid
+
+    @classmethod
+    def from_profile(cls, profile) -> "MonarchClient":
+        """Build a client from a stored user profile (dict or model)."""
+        get = profile.get if isinstance(profile, dict) else lambda k, d=None: getattr(profile, k, d)
+        return cls(
+            token=get("token"),
+            session_id=get("session_id"),
+            csrftoken=get("csrftoken"),
+            device_uuid=get("device_uuid"),
+        )
 
     @property
     def is_authenticated(self) -> bool:
-        return self._token is not None
+        return bool(self._session_id or self._token)
+
+    def _auth_headers(self, *, content_type: Optional[str] = "json") -> dict:
+        """Build authorized headers.
+
+        A browser session is preferred; a bearer token is used only when no
+        session is stored. The session header set mirrors what the Monarch
+        web app sends to api.monarch.com: a ``Cookie`` carrying the HttpOnly
+        ``session_id`` and the ``csrftoken``, the same CSRF value in
+        ``x-csrftoken``, ``client-platform: web``, and ``device-uuid``. The
+        web app sends no ``Authorization`` header. The CSRF header is
+        required: the session cookie alone is rejected with HTTP 403.
+
+        Pass content_type=None for multipart (aiohttp sets the
+        boundary-bearing Content-Type itself)."""
+        headers = dict(HEADERS)
+        if self._session_id:
+            headers["Cookie"] = f"session_id={self._session_id}; csrftoken={self._csrftoken}"
+            headers["x-csrftoken"] = self._csrftoken or ""
+            headers["client-platform"] = "web"
+            if self._device_uuid:
+                headers["device-uuid"] = self._device_uuid
+        else:
+            headers["Authorization"] = f"Token {self._token}"
+        if content_type is None:
+            headers.pop("Content-Type", None)
+        return headers
 
     async def _request(self, query: str, variables: Optional[dict] = None) -> dict:
-        if not self._token:
-            raise AuthenticationError(
-                "No Monarch token configured. Set up auth with:\n"
-                "  monarch-admin connect local\n"
-                "  monarch-admin users add local --token $MONARCH_SESSION_TOKEN"
-            )
+        if not self.is_authenticated:
+            raise AuthenticationError(NO_AUTH_MESSAGE)
 
-        headers = {**HEADERS, "Authorization": f"Token {self._token}"}
+        headers = self._auth_headers()
         payload = {"query": query}
         if variables:
             payload["variables"] = variables
 
         async with aiohttp.ClientSession() as session:
             async with session.post(GRAPHQL_URL, json=payload, headers=headers) as resp:
-                if resp.status == 401:
-                    raise AuthenticationError("Invalid or expired token")
+                if resp.status in (401, 403):
+                    raise AuthenticationError(EXPIRED_MESSAGE)
                 if resp.status != 200:
                     text = await resp.text()
                     raise APIError(f"HTTP {resp.status}: {text[:200]}")
@@ -70,18 +116,11 @@ class MonarchClient:
 
                 return data.get("data", {})
 
-    def _auth_headers(self, *, content_type: Optional[str] = "json") -> dict:
-        """Build authorized headers. Pass content_type=None for multipart
-        (aiohttp sets the boundary-bearing Content-Type itself)."""
-        headers = {**HEADERS, "Authorization": f"Token {self._token}"}
-        if content_type is None:
-            headers.pop("Content-Type", None)
-        return headers
 
     async def _download_balances(self, account_ids: list[str]) -> str:
         """POST /download-balances/ and return the CSV body (Date,Balance,Account)."""
-        if not self._token:
-            raise AuthenticationError("No Monarch token configured.")
+        if not self.is_authenticated:
+            raise AuthenticationError(NO_AUTH_MESSAGE)
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{API_BASE}/download-balances/",
@@ -89,8 +128,8 @@ class MonarchClient:
                 headers=self._auth_headers(),
             ) as resp:
                 text = await resp.text()
-                if resp.status == 401:
-                    raise AuthenticationError("Invalid or expired token")
+                if resp.status in (401, 403):
+                    raise AuthenticationError(EXPIRED_MESSAGE)
                 if resp.status != 200:
                     raise APIError(f"HTTP {resp.status}: {text[:200]}")
                 return text
@@ -124,8 +163,8 @@ class MonarchClient:
         Returns the upload response, including the session_key used to finalize
         processing via the parse mutation + session poll.
         """
-        if not self._token:
-            raise AuthenticationError("No Monarch token configured.")
+        if not self.is_authenticated:
+            raise AuthenticationError(NO_AUTH_MESSAGE)
         form = aiohttp.FormData()
         form.add_field("files", csv_text.encode(), filename=filename, content_type="text/csv")
         form.add_field("account_files_mapping", _json.dumps({filename: account_id}))
@@ -136,8 +175,8 @@ class MonarchClient:
                 data=form,
                 headers=self._auth_headers(content_type=None),
             ) as resp:
-                if resp.status == 401:
-                    raise AuthenticationError("Invalid or expired token")
+                if resp.status in (401, 403):
+                    raise AuthenticationError(EXPIRED_MESSAGE)
                 if resp.status not in (200, 201):
                     text = await resp.text()
                     raise APIError(f"HTTP {resp.status}: {text[:200]}")
@@ -152,7 +191,7 @@ class MonarchSDK:
     def _client(cls) -> MonarchClient:
         from mcp_app.context import current_user
         user = current_user.get()
-        return MonarchClient(token=user.profile.token)
+        return MonarchClient.from_profile(user.profile)
 
     @classmethod
     async def get_accounts(cls, include_closed: bool = False) -> dict:
@@ -160,6 +199,12 @@ class MonarchSDK:
         client = cls._client()
         accts = await accounts.get_accounts(client, include_closed=include_closed)
         return {"accounts": accts, "count": len(accts)}
+
+    @classmethod
+    async def count_accounts(cls) -> dict:
+        from . import accounts
+        accts = await accounts.get_accounts(cls._client())
+        return {"count": len(accts)}
 
     @classmethod
     async def get_categories(cls) -> dict:

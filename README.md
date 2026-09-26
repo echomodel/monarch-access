@@ -53,26 +53,52 @@ This installs three commands:
 
 ## Authentication
 
-Monarch doesn't have a public API, so you need to grab your session token from the browser:
-
-1. Go to https://app.monarch.com/ and log in
-2. Open DevTools (F12) → Console tab
-3. Paste and run:
-   ```javascript
-   JSON.parse(JSON.parse(localStorage.getItem("persist:root")).user).token
-   ```
-4. Copy the token string
-5. Register it:
-   ```bash
-   monarch-admin connect local
-   monarch-admin users add local --token $MONARCH_SESSION_TOKEN
-   ```
-
-The token is stored in the local user store and used by both the CLI and MCP server. Tokens typically last several months — rotate yours with:
+Monarch has no public API. Its web app authenticates with an HttpOnly session
+cookie plus a CSRF token, so the only place a valid session exists is a
+signed-in browser. `monarch-admin acquire-session` reads that session from
+your everyday Google Chrome, verifies it against the Monarch API, and stores it
+in a user profile on the target set by `monarch-admin connect` — the local
+store (used by the `monarch` CLI and the stdio MCP server) or a remote
+deployment.
 
 ```bash
-monarch-admin users update-profile local token $MONARCH_SESSION_TOKEN
+monarch-admin connect local        # once; the target persists
+monarch-admin acquire-session
 ```
+
+If Chrome is already signed in to Monarch with a session the API accepts, the
+session is stored with no prompt. Otherwise the Monarch sign-in page opens in
+Chrome and the command waits until you sign in.
+
+The command reads Chrome's cookie store directly (macOS). Chrome encrypts
+cookies with a key kept in the login Keychain as "Chrome Safe Storage", so
+macOS asks whether to allow access. Choose **Allow**: it grants access for
+that one read. **Always Allow** would let any program that runs the macOS
+`security` tool read the key silently — and with it every Chrome cookie.
+
+The command prints the user it updated and the session expiry — never
+credential values. Options:
+
+- `--user EMAIL` — the user whose profile receives the session. Defaults to the
+  target's only user; on an empty local store it creates `local`.
+- `--wait SECONDS` — how long to wait for a sign-in when one is needed
+  (default 300). Chrome writes new cookies to disk within about 30 seconds of
+  signing in.
+- `--cdp URL` — read from a Chrome you run with remote debugging (any OS)
+  instead of the everyday Chrome's cookie store.
+- `--print` — also write the session fields as JSON to stdout, for storing them
+  some other way.
+
+To update both your local store and a remote deployment, run the command once
+per target (`connect local`, import; `connect <url> --signing-key …`, import).
+
+### Rotating the session
+
+Sessions expire after a fixed period (the import reports the date). When calls
+fail with *"Monarch session invalid or expired"*, re-run
+`monarch-admin acquire-session` against each target; it opens the Monarch
+sign-in when Chrome's session has expired. `monarch-admin users get-profile <user>` shows the stored
+`session_expires`.
 
 ## CLI Usage
 
@@ -318,11 +344,12 @@ The `monarch-mcp` command exposes Monarch data via the [Model Context Protocol](
 
 ### Setup
 
-Register a local MCP user with your Monarch token:
+Import your Monarch session into the local store (see
+[Authentication](#authentication)):
 
 ```bash
 monarch-admin connect local
-monarch-admin users add local --token $MONARCH_SESSION_TOKEN
+monarch-admin acquire-session
 ```
 
 ### Register with Claude Code
@@ -342,6 +369,7 @@ gemini mcp add monarch -- monarch-mcp stdio --user local
 | Tool | Description |
 |------|-------------|
 | `list_accounts` | Get all accounts with balances |
+| `count_accounts` | Count open accounts (returns only a number; the admin safe tool) |
 | `update_account` | Rename, exclude from net worth, or hide an account |
 | `close_account` | Close an account (keeps balance history in net worth) |
 | `get_holdings` | Get investment holdings (shares, cost basis, tax lots) |
@@ -367,7 +395,7 @@ For detailed documentation, see **[MCP-SERVER.md](./MCP-SERVER.md)**.
 
 ## Cloud Deployment (Optional)
 
-Deploying monarch-access as an HTTP MCP server means your Monarch session token stays on the server and is never exposed to clients — each client authenticates with a JWT issued by `monarch-admin`.
+Deploying monarch-access as an HTTP MCP server means your Monarch session stays on the server and is never exposed to clients — each client authenticates with a JWT issued by `monarch-admin`.
 
 ### Runtime contract
 
@@ -392,25 +420,30 @@ monarch-admin connect https://your-service-url --signing-key "$SIGNING_KEY"
 
 `connect` persists the URL and signing key to `~/.config/monarch/setup.json`, so subsequent `monarch-admin` commands don't need the flags repeated.
 
+### Register a user and import their session
+
+```bash
+monarch-admin users add user@example.com
+monarch-admin acquire-session --user user@example.com
+```
+
+`acquire-session` against a remote target writes the session into that user's
+profile on the deployment (see [Authentication](#authentication) for the
+Chrome setup). Re-run it to rotate an expired session; the user's JWT and the
+rest of their profile are unaffected. To revoke a user entirely (invalidates
+their JWT), use `monarch-admin users revoke user@example.com`.
+
 ### Verify the deployment
 
 ```bash
-monarch-admin health
+monarch-admin probe                  # liveness, admin auth, MCP tools/list round-trip
+monarch-admin safe-tool --invoke     # calls count_accounts end to end
 ```
 
-### Register a user
-
-```bash
-monarch-admin users add user@example.com --token "$MONARCH_SESSION_TOKEN"
-```
-
-See [Authentication](#authentication) for how to obtain `$MONARCH_SESSION_TOKEN`. To rotate a user's token in place (keeps their JWT valid and their profile intact):
-
-```bash
-monarch-admin users update-profile user@example.com token "$NEW_TOKEN"
-```
-
-To revoke a user entirely (invalidates their JWT), use `monarch-admin users revoke user@example.com`.
+`probe` proves the deployment and its JWT layer work. `safe-tool --invoke`
+goes further: it calls `count_accounts` as a registered user, so it exercises
+the stored Monarch session. A response of `{"count": N}` means the full stack
+works; an authentication error in the body means the session needs rotating.
 
 ### Issue a JWT for an MCP client
 
