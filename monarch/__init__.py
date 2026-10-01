@@ -30,22 +30,25 @@ class Profile(BaseModel):
     session_id: Optional[str] = Field(
         default=None,
         description=(
-            "Monarch web session cookie (HttpOnly). Imported from a logged-in "
-            "Chrome with `monarch-admin acquire-session`; sessions expire after a "
-            "fixed period, re-run it when calls start failing."
+            "Monarch web session cookie (HttpOnly). Set with `monarch-admin "
+            "acquire-session` (from a browser, or by hand with --stdin); re-run it "
+            "when calls fail with 'session invalid or expired'."
         ),
     )
     csrftoken: Optional[str] = Field(
         default=None,
-        description="Monarch csrftoken cookie, sent as the x-csrftoken header. Stored with session_id by acquire-session.",
+        description="Monarch csrftoken cookie, sent as the x-csrftoken header. Set with session_id by acquire-session.",
     )
     device_uuid: Optional[str] = Field(
         default=None,
-        description="Browser device id (monarchDeviceUUID cookie). Stored with session_id by acquire-session.",
+        description="Browser device id (monarchDeviceUUID cookie). Optional; set with session_id by acquire-session.",
     )
     session_expires: Optional[str] = Field(
         default=None,
-        description="When the imported session expires (ISO-8601 UTC), for operator visibility.",
+        description=(
+            "Session cookie expiry (ISO-8601 UTC), for operator visibility. The latest "
+            "the session can last, not a guarantee; Monarch may end it sooner."
+        ),
     )
     token: Optional[str] = Field(
         default=None,
@@ -66,6 +69,7 @@ app = App(
     ),
 )
 
-from .admin import acquire_session as _acquire_session  # noqa: E402
+from .admin import acquire_session as _acquire_session, cdp_url as _cdp_url  # noqa: E402
 
 app.admin_cli.add_command(_acquire_session)
+app.admin_cli.add_command(_cdp_url)

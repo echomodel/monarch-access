@@ -20,8 +20,8 @@ The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standa
    pipx install git+https://github.com/echomodel/monarch-access.git
    ```
 
-2. **Import your Monarch session** into the local store (opens a Monarch
-   sign-in in Chrome when needed; see [README.md](./README.md#authentication)):
+2. **Import your Monarch session** into the local store (sources and setup:
+   [README → Authentication](./README.md#authentication)):
    ```bash
    monarch-admin connect local
    monarch-admin acquire-session
@@ -74,15 +74,9 @@ gemini mcp list
 
 ### Local (stdio)
 
-The MCP server uses mcp-app's user store. `monarch-admin acquire-session`
-imports the Monarch browser session into the `local` user's profile:
-
-```bash
-monarch-admin connect local
-monarch-admin acquire-session
-```
-
-Re-run `acquire-session` to rotate an expired session.
+The stdio server reads the `local` user's profile in mcp-app's local user
+store. Import the session there as described in
+[README → Authentication](./README.md#authentication) (target: local store).
 
 ### Cloud (HTTP)
 
@@ -92,13 +86,8 @@ See [Cloud Deployment](./README.md#cloud-deployment-optional) for deploying as a
 
 ### "Monarch session invalid or expired" / "No Monarch session configured"
 
-The stored session has expired or was never imported:
-
-Run `monarch-admin acquire-session` against each target you use
-(`monarch-admin connect local` or `connect <url> --signing-key …` first). It
-opens a Monarch sign-in in Chrome when the browser's session has expired.
-
-`monarch-admin users get-profile local` shows the stored `session_expires`.
+The stored session has ended or was never imported. See
+[README → Session lifecycle](./README.md#session-lifecycle).
 
 ### Server not starting
 
@@ -109,14 +98,14 @@ monarch-mcp stdio --user local
 
 If it exits with errors, check that:
 1. Dependencies are installed: `pipx reinstall monarch-access`
-2. A session is imported: `monarch-admin connect local && monarch-admin acquire-session`
+2. A session is imported into the local store ([README → Authentication](./README.md#authentication))
 
 ## Security
 
 - **Credential storage**: Never commit session values to version control; `acquire-session` never prints them unless `--print` is given
 - **Local stdio**: Runs locally under your user account; the session is stored in mcp-app's local user store
 - **Cloud HTTP**: The session is stored server-side; clients authenticate with JWTs issued by `monarch-admin`
-- **Session expiration**: Monarch sessions expire after a fixed period; rotate with `monarch-admin acquire-session`
+- **Session expiration**: see [README → Session lifecycle](./README.md#session-lifecycle)
 
 ## Related Documentation
 

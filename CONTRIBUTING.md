@@ -8,8 +8,9 @@ monarch-access/
 ├── Makefile              # Development commands
 ├── monarch/              # SDK package
 │   ├── cli.py            # CLI entry point (monarch command)
-│   ├── admin.py          # monarch-admin extensions (acquire-session)
-│   ├── auth.py           # Browser-session import: read, verify, store
+│   ├── admin.py          # monarch-admin extensions (acquire-session, cdp-url)
+│   ├── auth.py           # Session import: sources, liveness, store
+│   ├── settings.py       # Persistent settings (DevTools endpoint)
 │   ├── chrome_cookies.py # Reads/decrypts Chrome's cookie store (macOS)
 │   ├── client.py         # MonarchClient - auth & API requests
 │   ├── queries.py        # GraphQL queries
@@ -85,7 +86,17 @@ The `App` object in `monarch/__init__.py` wires everything: tools module, profil
 
 The `Profile` model in `monarch/__init__.py` holds each user's Monarch credential: the browser session (`session_id`, `csrftoken`, `device_uuid`, `session_expires`) and an optional bearer `token` used only when no session is stored. Every field must carry a `Field(description=...)` — the descriptions drive `monarch-admin users add --help` / `update-profile --help`, which is how operators discover what a field is and how to obtain it. When adding a field, update the description, README's Authentication section, and tests.
 
-`monarch-admin acquire-session` gets the session from the everyday Chrome's cookie store (`chrome_cookies.py`: SQLite copy + AES-CBC with the "Chrome Safe Storage" Keychain key; from cookie DB version 24 the plaintext carries a 32-byte host-hash prefix) or from a remote-debugging Chrome (`--cdp`). It verifies with a `me { id }` query and opens the sign-in page only when no stored browser session verifies.
+`monarch-admin acquire-session` resolves the session source in `monarch/auth.py`:
+
+1. `--stdin`: manual values (`session_from_input`), no browser.
+2. `--cdp URL`: that DevTools endpoint only (`CdpSource`), no fallback.
+3. Otherwise `default_sources()`: the configured DevTools endpoint (`CdpSource`), then — macOS only — the everyday Chrome's cookie store (`ChromeSource`, `chrome_cookies.py`: SQLite copy + AES-CBC with the "Chrome Safe Storage" Keychain key; from cookie DB version 24 the plaintext carries a 32-byte host-hash prefix).
+
+`acquire_from()` walks the sources in order. Liveness decides, not cookie expiry: a candidate counts only if `me { id }` accepts it, and a source with no live session falls through to the next. A source that cannot be read at all (`SourceUnavailable`, e.g. nothing listening on the port) is skipped; if none is readable, `NoSourceReachable` carries the "start a remote-debugging Chrome or use --stdin" guidance. When no source has a live session, the sign-in page opens in the first readable source and only that source is polled. The DevTools path (reading and sign-in-and-wait) is portable; cookie decryption is macOS-only, so `ChromeSource` is not in the default list elsewhere.
+
+The DevTools endpoint is a persisted setting in `$XDG_CONFIG_HOME/monarch/settings.json` (`monarch/settings.py`), managed with `monarch-admin cdp-url` — never an environment variable. `settings.json` is separate from `setup.json`, which belongs to mcp-app's `connect`.
+
+`tests/unit/sdk/test_session_sources.py` covers the matrix: no endpoint → cookie store; endpoint without a live session (none, or rejected) → cookie store; endpoint with a live session → cookie store never read; nothing live → sign-in opens in the first readable source; manual import (validation, `--print` round trip, cookie-name aliases, bad stdin rejected before any store is touched); platform source lists; the setting. Browser readers are replaced by stand-in sources; the ordering logic is the real code.
 
 `MonarchClient._auth_headers` sends the session as the web app does (cookie + `x-csrftoken` header); see its docstring for the observed header set. 401 and 403 responses raise `AuthenticationError` with the rotation instructions.
 

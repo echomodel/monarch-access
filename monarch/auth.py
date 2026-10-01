@@ -3,11 +3,11 @@
 Monarch's web app authenticates its API calls with an HttpOnly session
 cookie plus a CSRF token, not a bearer token. The only place a valid
 session exists is a signed-in browser. This module reads that session from
-the user's everyday Chrome (its cookie store; see ``chrome_cookies``) or,
-optionally, from a Chrome running with remote debugging, verifies it
-against the API, and stores it in a user profile of the local store or a
-remote deployment. A sign-in is requested only when the browser holds no
-session the API accepts.
+a Chrome running with remote debugging (DevTools protocol) or, as a
+fallback, the everyday Chrome's cookie store (see ``chrome_cookies``; needs
+Keychain access), verifies it against the API, and stores it in a user
+profile of the local store or a remote deployment. A sign-in is requested
+only when no source holds a session the API accepts.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import Callable, Optional
 
 import aiohttp
 
-from . import chrome_cookies
+from . import chrome_cookies, settings
 from .client import MonarchClient, AuthenticationError
 
 LOCAL_USER = "local"  # user the CLI and stdio MCP server read
@@ -92,13 +92,81 @@ async def _cdp_call(cdp_url: str, method: str, params: Optional[dict] = None) ->
     return msg.get("result", {})
 
 
+class SourceUnavailable(Exception):
+    """A session source cannot be read at all (e.g. no DevTools endpoint answers)."""
+
+
+class NoSourceReachable(BrowserSessionError):
+    """No session source could be read at all."""
+
+
+MANUAL_SOURCE = "manual input"
+
+# Accepted input keys -> profile field. Cookie names as shown in a browser's
+# DevTools (Application -> Cookies -> app.monarch.com) are accepted alongside
+# the profile field names that `acquire-session --print` emits.
+_MANUAL_KEYS = {
+    "session_id": "session_id",
+    "csrftoken": "csrftoken",
+    "device_uuid": "device_uuid",
+    "monarchDeviceUUID": "device_uuid",
+    "session_expires": "session_expires",
+}
+
+
+def session_from_input(data: dict) -> dict:
+    """Build a session from manually supplied values (``--print`` JSON or cookie names).
+
+    ``session_id`` and ``csrftoken`` are required; the device id and expiry are
+    optional. Unknown keys are rejected so a typo cannot silently drop a field.
+    """
+    if not isinstance(data, dict):
+        raise BrowserSessionError("Session input must be a JSON object.")
+    unknown = sorted(set(data) - set(_MANUAL_KEYS))
+    if unknown:
+        raise BrowserSessionError(f"Unknown session field(s): {', '.join(unknown)}")
+    session = {"session_id": None, "csrftoken": None, "device_uuid": None, "session_expires": None}
+    for key, value in data.items():
+        value = value.strip() if isinstance(value, str) else value
+        if value:
+            session[_MANUAL_KEYS[key]] = value
+    missing = [k for k in ("session_id", "csrftoken") if not session[k]]
+    if missing:
+        raise BrowserSessionError(f"Missing required session field(s): {', '.join(missing)}")
+    return session
+
+
+class CdpSource:
+    """Monarch session from a Chrome running with remote debugging (DevTools protocol)."""
+
+    def __init__(self, cdp_url: str):
+        self.cdp_url = cdp_url.rstrip("/")
+        self.name = f"Chrome DevTools at {self.cdp_url}"
+
+    async def candidates(self) -> list[dict]:
+        try:
+            cookies = (await _cdp_call(self.cdp_url, "Storage.getCookies"))["cookies"]
+        except BrowserSessionError as exc:
+            raise SourceUnavailable(str(exc)) from exc
+        try:
+            return [pick_session(cookies)]
+        except BrowserSessionError:
+            return []
+
+    async def open_login(self) -> None:
+        target = await _cdp_call(self.cdp_url, "Target.createTarget", {"url": LOGIN_URL})
+        await _cdp_call(self.cdp_url, "Target.activateTarget", {"targetId": target["targetId"]})
+
+
 class ChromeSource:
-    """Monarch sessions from the user's everyday Chrome (its cookie store)."""
+    """Monarch sessions from the everyday Chrome's cookie store (macOS Keychain prompt)."""
+
+    name = "Chrome cookie store (Keychain)"
 
     def __init__(self):
         self._key: Optional[bytes] = None
 
-    def candidates(self) -> list[dict]:
+    def _read(self) -> list[dict]:
         if self._key is None:
             self._key = chrome_cookies.safe_storage_key()
         found = []
@@ -107,8 +175,13 @@ class ChromeSource:
                 found.append(pick_session(chrome_cookies.read_cookies(db, MONARCH_DOMAIN, self._key)))
             except BrowserSessionError:
                 continue
-        # Longest-lived session first: the most recent sign-in.
-        return sorted(found, key=lambda s: s.get("session_expires") or "", reverse=True)
+        return found
+
+    async def candidates(self) -> list[dict]:
+        try:
+            return await asyncio.to_thread(self._read)
+        except chrome_cookies.ChromeCookieError as exc:
+            raise BrowserSessionError(str(exc)) from exc
 
     async def open_login(self) -> None:
         if sys.platform == "darwin":
@@ -117,66 +190,86 @@ class ChromeSource:
             webbrowser.open(LOGIN_URL)
 
 
-class CdpSource:
-    """Monarch session from a Chrome the user runs with remote debugging."""
+async def acquire_from(sources: list, *, verify_fn: Callable = None, wait: float = 300,
+                       poll: float = 3, on_status: Callable[[str], None] = lambda _m: None
+                       ) -> tuple[dict, str]:
+    """Return ``(session, source name)`` for the first live session, in source order.
 
-    def __init__(self, cdp_url: str):
-        self.cdp_url = cdp_url.rstrip("/")
-
-    async def open_login(self) -> None:
-        target = await _cdp_call(self.cdp_url, "Target.createTarget", {"url": LOGIN_URL})
-        await _cdp_call(self.cdp_url, "Target.activateTarget", {"targetId": target["targetId"]})
-
-
-async def _candidates(source) -> list[dict]:
-    if isinstance(source, CdpSource):
-        cookies = (await _cdp_call(source.cdp_url, "Storage.getCookies"))["cookies"]
-        try:
-            return [pick_session(cookies)]
-        except BrowserSessionError:
-            return []
-    try:
-        return await asyncio.to_thread(source.candidates)
-    except chrome_cookies.ChromeCookieError as exc:
-        raise BrowserSessionError(str(exc)) from exc
-
-
-async def acquire_session(cdp_url: Optional[str] = None, *, wait: float = 300, poll: float = 3,
-                          on_status: Callable[[str], None] = lambda _m: None) -> dict:
-    """Return a verified Monarch session, asking for a sign-in only when needed.
-
-    Reads the session the browser already holds (the everyday Chrome's cookie
-    store by default, or a debugging Chrome at ``cdp_url``). If none is
-    accepted by the API, opens the Monarch sign-in page in that browser and
-    polls until a new session verifies or ``wait`` seconds pass.
+    Liveness is decided by the API (``verify_fn``, default ``me { id }``), not by
+    cookie expiry. A source that cannot be read at all (``SourceUnavailable``) is
+    skipped; a source with no live session falls through to the next. When none
+    has a live session, the Monarch sign-in page opens in the first readable
+    source and that source is polled until a new session verifies or ``wait``
+    seconds pass.
     """
-    source = CdpSource(cdp_url) if cdp_url else ChromeSource()
+    verify_fn = verify_fn or verify
+    rejected: set = set()
 
-    async def _first_valid(seen: set) -> Optional[dict]:
-        for session in await _candidates(source):
-            if session["session_id"] in seen:
+    async def _live(source) -> Optional[dict]:
+        for session in await source.candidates():
+            if session["session_id"] in rejected:
                 continue
-            seen.add(session["session_id"])
             try:
-                await verify(session)
+                await verify_fn(session)
                 return session
             except AuthenticationError:
-                continue
+                rejected.add(session["session_id"])
         return None
 
-    rejected: set = set()
-    session = await _first_valid(rejected)
-    if session:
-        return session
-    await source.open_login()
-    on_status("Sign in to Monarch in the Chrome tab that just opened; waiting...")
+    readable = []
+    for source in sources:
+        try:
+            session = await _live(source)
+        except SourceUnavailable:
+            continue
+        readable.append(source)
+        if session:
+            return session, source.name
+    if not readable:
+        raise NoSourceReachable("No browser session source is reachable.")
+
+    login_source = readable[0]
+    await login_source.open_login()
+    on_status(f"Sign in to Monarch in the tab that just opened ({login_source.name}); waiting...")
     deadline = time.monotonic() + wait
     while time.monotonic() < deadline:
         await asyncio.sleep(poll)
-        session = await _first_valid(rejected)
+        session = await _live(login_source)
         if session:
-            return session
+            return session, login_source.name
     raise BrowserSessionError(f"No Monarch sign-in within {int(wait)} seconds.")
+
+
+def default_sources(cdp_url: str, platform: str = sys.platform) -> list:
+    """Source order without ``--cdp``: the DevTools endpoint, then (macOS only)
+    the everyday Chrome's cookie store. No cookie-store reader exists for other
+    platforms, so there the DevTools endpoint is the only automatic source."""
+    sources = [CdpSource(cdp_url)]
+    if platform == "darwin":
+        sources.append(ChromeSource())
+    return sources
+
+
+async def acquire_session(cdp_url: Optional[str] = None, *, wait: float = 300, poll: float = 3,
+                          on_status: Callable[[str], None] = lambda _m: None) -> tuple[dict, str]:
+    """Return ``(session, source name)``, asking for a sign-in only when needed.
+
+    With ``cdp_url`` given, only that DevTools endpoint is used. Otherwise the
+    configured DevTools endpoint (``settings.get_cdp_url()``) is tried first and
+    the everyday Chrome's cookie store — which needs Keychain access — only when
+    that endpoint is unreachable or holds no live session (macOS only).
+    """
+    endpoint = cdp_url or settings.get_cdp_url()
+    sources = [CdpSource(endpoint)] if cdp_url else default_sources(endpoint)
+    try:
+        return await acquire_from(sources, wait=wait, poll=poll, on_status=on_status)
+    except NoSourceReachable:
+        raise NoSourceReachable(
+            f"No Chrome DevTools endpoint answered at {endpoint}. Start a Chrome with "
+            "remote debugging enabled and signed in to Monarch (set its endpoint with "
+            "`monarch-admin cdp-url`), or import the session manually with "
+            "`monarch-admin acquire-session --stdin`."
+        ) from None
 
 
 class SessionTargetError(Exception):

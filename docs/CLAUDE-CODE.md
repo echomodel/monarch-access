@@ -8,8 +8,8 @@
 
 ## Quick Start
 
-1. Import your Monarch session into the local store (opens a Monarch sign-in
-   in Chrome when needed):
+1. Import your Monarch session into the local store (sources and setup:
+   [README → Authentication](../README.md#authentication)):
    ```bash
    monarch-admin connect local
    monarch-admin acquire-session
@@ -106,9 +106,8 @@ claude mcp add --scope user monarch -- monarch-mcp stdio --user local
    monarch-admin users list
    ```
 
-**Session expiration:**
-- Monarch sessions expire after a fixed period
-- Run `monarch-admin acquire-session` (prompts for a sign-in if needed)
+**Session expired ("Monarch session invalid or expired"):**
+- See [README → Session lifecycle](../README.md#session-lifecycle)
 - No MCP re-registration needed
 
 **Permission errors:**

@@ -54,51 +54,98 @@ This installs three commands:
 ## Authentication
 
 Monarch has no public API. Its web app authenticates with an HttpOnly session
-cookie plus a CSRF token, so the only place a valid session exists is a
-signed-in browser. `monarch-admin acquire-session` reads that session from
-your everyday Google Chrome, verifies it against the Monarch API, and stores it
-in a user profile on the target set by `monarch-admin connect` — the local
-store (used by the `monarch` CLI and the stdio MCP server) or a remote
-deployment.
+cookie plus a CSRF token, so a valid session exists only in a browser signed in
+to Monarch. `monarch-admin acquire-session` takes that session, verifies it
+against the Monarch API (`me { id }`), and stores it in a user profile. It never
+prints credential values unless `--print` is given.
 
-```bash
-monarch-admin connect local        # once; the target persists
-monarch-admin acquire-session
-```
+Importing a session involves two independent choices: **where the session comes
+from** (source) and **where it is stored** (target).
 
-If Chrome is already signed in to Monarch with a session the API accepts, the
-session is stored with no prompt. Otherwise the Monarch sign-in page opens in
-Chrome and the command waits until you sign in.
+### Source
 
-The command reads Chrome's cookie store directly (macOS). Chrome encrypts
-cookies with a key kept in the login Keychain as "Chrome Safe Storage", so
-macOS asks whether to allow access. Choose **Allow**: it grants access for
-that one read. **Always Allow** would let any program that runs the macOS
-`security` tool read the key silently — and with it every Chrome cookie.
+Without flags, `acquire-session` tries the sources below in order and uses the
+first one holding a session the Monarch API accepts. It prints which one it
+used.
 
-The command prints the user it updated and the session expiry — never
-credential values. Options:
+1. **A Chrome with remote debugging enabled (any OS, recommended).** The
+   session is read over the DevTools protocol at the configured endpoint, with
+   no prompt. Chrome refuses remote debugging on its default profile directory,
+   so run a dedicated profile:
 
-- `--user EMAIL` — the user whose profile receives the session. Defaults to the
-  target's only user; on an empty local store it creates `local`.
-- `--wait SECONDS` — how long to wait for a sign-in when one is needed
-  (default 300). Chrome writes new cookies to disk within about 30 seconds of
-  signing in.
-- `--cdp URL` — read from a Chrome you run with remote debugging (any OS)
-  instead of the everyday Chrome's cookie store.
-- `--print` — also write the session fields as JSON to stdout, for storing them
-  some other way.
+   ```bash
+   <path-to-chrome> --user-data-dir=<a-dedicated-dir> --remote-debugging-port=9222
+   ```
 
-To update both your local store and a remote deployment, run the command once
-per target (`connect local`, import; `connect <url> --signing-key …`, import).
+   Sign in to Monarch in that window. The default endpoint is
+   `http://127.0.0.1:9222`; show or change it with:
 
-### Rotating the session
+   ```bash
+   monarch-admin cdp-url                          # show
+   monarch-admin cdp-url http://127.0.0.1:9333    # set
+   monarch-admin cdp-url --reset                  # back to the default
+   ```
 
-Sessions expire after a fixed period (the import reports the date). When calls
-fail with *"Monarch session invalid or expired"*, re-run
-`monarch-admin acquire-session` against each target; it opens the Monarch
-sign-in when Chrome's session has expired. `monarch-admin users get-profile <user>` shows the stored
-`session_expires`.
+   `--cdp URL` uses only that endpoint for one run, with no fallback. The
+   debugging port is an unauthenticated local endpoint: any program on the
+   machine can drive that Chrome and read its cookies while it runs. Keep it
+   running only while you need it.
+
+2. **The everyday Chrome's cookie store (macOS only, fallback).** Used only when
+   no DevTools endpoint answers or its browser has no live Monarch session.
+   Chrome encrypts cookies with a key in the login Keychain ("Chrome Safe
+   Storage"), so macOS prompts for access. Choose **Allow** (one read).
+   **Always Allow** would let any program that runs the macOS `security` tool
+   read that key silently, and with it every Chrome cookie. No cookie-store
+   reader exists for Linux or Windows; there, use a DevTools Chrome or a manual
+   import.
+
+3. **Manual (any browser, any OS).** `--stdin` skips the browser:
+
+   ```bash
+   # At a terminal: prompts (hidden) for the session_id, csrftoken and
+   # monarchDeviceUUID cookie values from your browser's DevTools
+   # (Application -> Cookies -> https://app.monarch.com).
+   monarch-admin acquire-session --stdin
+
+   # Or move a session between machines: --print on one, --stdin on the other.
+   monarch-admin acquire-session --print > session.json
+   monarch-admin acquire-session --stdin < session.json
+   ```
+
+   Values are never passed as arguments, so they stay out of shell history.
+   Delete any `session.json` once imported.
+
+If no source has a live session, the Monarch sign-in page opens in the first
+reachable browser and the command waits (`--wait`, default 300 seconds) for
+you to sign in.
+
+### Target
+
+The session is stored on the target set by `monarch-admin connect`, in the
+profile of the target's only user (`--user EMAIL` picks one when there are
+several):
+
+| | Local store | Remote deployment |
+|---|---|---|
+| Used by | `monarch` CLI, stdio MCP server | HTTP MCP server and its clients |
+| Select it | `monarch-admin connect local` | `monarch-admin connect <url> --signing-key <key>` |
+| Import | `monarch-admin acquire-session` | `monarch-admin acquire-session` |
+
+Run `acquire-session` once per target you use. `connect` saves one target at a
+time: switching to `local` replaces the saved remote URL and signing key, so
+have the signing key at hand to switch back.
+
+### Session lifecycle
+
+- **Stay signed in to Monarch from one browser profile** (the DevTools Chrome
+  above), so the session you import is the one that browser keeps using.
+- **A session lasts about two months.** `acquire-session` prints its cookie
+  expiry and `monarch-admin users get-profile <user>` shows it as
+  `session_expires`. That is the latest the session can last; Monarch can end
+  it sooner.
+- **When calls fail with "Monarch session invalid or expired"**, re-run
+  `monarch-admin acquire-session` against each target you use.
 
 ## CLI Usage
 
@@ -428,8 +475,8 @@ monarch-admin acquire-session --user user@example.com
 ```
 
 `acquire-session` against a remote target writes the session into that user's
-profile on the deployment (see [Authentication](#authentication) for the
-Chrome setup). Re-run it to rotate an expired session; the user's JWT and the
+profile on the deployment (see [Authentication](#authentication) for session
+sources). Re-run it to rotate an expired session; the user's JWT and the
 rest of their profile are unaffected. To revoke a user entirely (invalidates
 their JWT), use `monarch-admin users revoke user@example.com`.
 
