@@ -102,7 +102,7 @@ The DevTools endpoint is a persisted setting in `$XDG_CONFIG_HOME/monarch/settin
 
 ### Admin CLI extensions
 
-`monarch-admin` is mcp-app's generated admin CLI. App-specific admin commands are Click commands in `monarch/admin.py`, attached in `monarch/__init__.py` with `app.admin_cli.add_command(...)`. They stay thin: the logic lives in `monarch/auth.py`, and the command resolves its target store (local or remote, per `monarch-admin connect`) through the framework's `_get_auth_store` helper so it writes where the `users` commands do.
+`monarch-admin` is mcp-app's generated admin CLI. App-specific admin commands are Click commands in `monarch/admin.py`, attached in `monarch/__init__.py` with `app.admin_cli.add_command(...)`. They stay thin: the logic lives in `monarch/auth.py`, and the command resolves its target store (local or remote, per `monarch-admin connect`) through mcp-app's public `admin_store`/`admin_target` helpers so it writes where the `users` commands do.
 
 ### Safe tool
 

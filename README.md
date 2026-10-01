@@ -129,12 +129,12 @@ several):
 | | Local store | Remote deployment |
 |---|---|---|
 | Used by | `monarch` CLI, stdio MCP server | HTTP MCP server and its clients |
-| Select it | `monarch-admin connect local` | `monarch-admin connect <url> --signing-key <key>` |
+| Select it | `monarch-admin connect local` | `monarch-admin connect <url> --signing-key <key>` (first time), then `monarch-admin connect remote` |
 | Import | `monarch-admin acquire-session` | `monarch-admin acquire-session` |
 
-Run `acquire-session` once per target you use. `connect` saves one target at a
-time: switching to `local` replaces the saved remote URL and signing key, so
-have the signing key at hand to switch back.
+Run `acquire-session` once per target you use. Switching to `local` keeps the
+saved remote URL and signing key; `connect remote` switches back without
+re-entering the key.
 
 ### Session lifecycle
 

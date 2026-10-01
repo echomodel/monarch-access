@@ -47,12 +47,12 @@ def acquire_session(cdp_url, wait, user, from_stdin, print_json):
         raise click.UsageError("--stdin and --cdp are mutually exclusive.")
     manual = _read_manual_session() if from_stdin else None
 
-    # Private framework helper: resolves the local-or-remote store chosen
-    # by `monarch-admin connect`, the same one `users` commands use.
-    from mcp_app.cli import _get_auth_store, _load_setup
+    # The store for the target chosen by `monarch-admin connect` — the same
+    # one the built-in `users` commands use.
+    from mcp_app import admin_store, admin_target
 
-    local = _load_setup("monarch").get("mode") == "local"
-    store = _get_auth_store("monarch")
+    local = admin_target("monarch") == "local"
+    store = admin_store("monarch")
 
     async def _run():
         try:
