@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Monarch Access Installed:** `pipx install git+https://github.com/krisrowe/monarch-access.git`
+- **Monarch Access Installed:** `pipx install git+https://github.com/echomodel/monarch-access.git`
 - **Monarch session:** See [README.md](../README.md#authentication)
 - **Claude Code Installed:** [Install Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 

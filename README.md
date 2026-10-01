@@ -38,7 +38,7 @@ Total: $3,222.35
 ## Installation
 
 ```bash
-pipx install git+https://github.com/krisrowe/monarch-access.git
+pipx install git+https://github.com/echomodel/monarch-access.git
 ```
 
 This installs three commands:

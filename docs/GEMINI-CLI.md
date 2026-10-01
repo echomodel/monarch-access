@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Monarch Access Installed:** `pipx install git+https://github.com/krisrowe/monarch-access.git`
+- **Monarch Access Installed:** `pipx install git+https://github.com/echomodel/monarch-access.git`
 - **Monarch session:** See [README.md](../README.md#authentication)
 - **Gemini CLI or Gemini Code Assist Installed:**
   - For Gemini CLI: [Install Gemini CLI](https://google-gemini.github.io/gemini-cli/)

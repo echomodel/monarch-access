@@ -42,7 +42,7 @@ monarch-access/
 After cloning, just run tests - venv is created automatically:
 
 ```bash
-git clone https://github.com/krisrowe/monarch-access.git
+git clone https://github.com/echomodel/monarch-access.git
 cd monarch-access
 make test
 ```

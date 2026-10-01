@@ -37,8 +37,8 @@ monarch-admin = "monarch:app.admin_cli"
 monarch = "monarch:app"
 
 [project.urls]
-Homepage = "https://github.com/krisrowe/monarch-access"
-Repository = "https://github.com/krisrowe/monarch-access"
+Homepage = "https://github.com/echomodel/monarch-access"
+Repository = "https://github.com/echomodel/monarch-access"
 
 [tool.setuptools.packages.find]
 include = ["monarch*"]

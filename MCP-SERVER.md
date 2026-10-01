@@ -17,7 +17,7 @@ The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standa
 
 1. **Install** (includes CLI, MCP server, and admin tools):
    ```bash
-   pipx install git+https://github.com/krisrowe/monarch-access.git
+   pipx install git+https://github.com/echomodel/monarch-access.git
    ```
 
 2. **Import your Monarch session** into the local store (opens a Monarch
