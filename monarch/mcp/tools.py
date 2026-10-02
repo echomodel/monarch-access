@@ -672,12 +672,14 @@ async def create_rule(
     and the split silently stops. Use apply_to_existing=True to move past
     payments, and check the result with list_transactions.
 
-    Moving payments does not move their recurring "paid" status: the old
-    merchant's stream keeps them until the new merchant's stream is updated.
-    After the rule, set the new merchant's stream amount (and frequency) to
-    the current payment with update_recurring; Monarch then re-matches the
-    payments to it within minutes. A payment only counts as paid when its
-    amount matches the stream's amount.
+    Recurring "paid" status may not follow moved payments right away: the
+    old merchant's stream can keep them while the new merchant's stream
+    shows unpaid. Check with list_recurring after moving payments. If the
+    new stream still shows unpaid, set its amount (and frequency) to the
+    current payment with update_recurring, which makes Monarch re-match
+    within minutes. Small differences between payment and stream amount
+    are tolerated; large ones (for example after a premium change) leave
+    the payment unmatched.
 
     Args:
         set_category_action: Category ID to assign to matching transactions.
