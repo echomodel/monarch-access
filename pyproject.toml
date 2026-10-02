@@ -13,8 +13,8 @@ dependencies = [
     "aiohttp>=3.8.0",
     "click>=8.0.0",
     "tinydb>=4.8.0",
-    "mcp-app @ git+https://github.com/echomodel/mcp-app.git@v0.10.0",
-    "mcp<2",  # mcp-app v0.10.0 uses the v1 FastMCP API and does not cap mcp
+    "mcp-app @ git+https://github.com/echomodel/mcp-app.git@v0.11.0",
+    "mcp<2",  # mcp-app v0.11.0 uses the v1 FastMCP API and does not cap mcp
     "pydantic>=2.0.0",
     "cryptography>=42",  # decrypts Chrome's cookie store (monarch-admin acquire-session)
 ]

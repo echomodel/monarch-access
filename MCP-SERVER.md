@@ -33,11 +33,13 @@ The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standa
 claude mcp add --scope user monarch -- monarch-mcp stdio --user local
 ```
 
-### Register with Gemini CLI
+### Register with Antigravity CLI (agy)
 
 ```bash
-gemini mcp add monarch -- monarch-mcp stdio --user local
+agy mcp add monarch -- monarch-mcp stdio --user local
 ```
+
+See [docs/ANTIGRAVITY-CLI.md](docs/ANTIGRAVITY-CLI.md) for agy details.
 
 ### Verify
 
@@ -45,8 +47,8 @@ gemini mcp add monarch -- monarch-mcp stdio --user local
 # Claude Code
 claude mcp list
 
-# Gemini CLI
-gemini mcp list
+# Antigravity CLI
+agy mcp list
 ```
 
 ## Available Tools

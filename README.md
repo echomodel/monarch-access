@@ -405,11 +405,13 @@ monarch-admin acquire-session
 claude mcp add --scope user monarch -- monarch-mcp stdio --user local
 ```
 
-### Register with Gemini CLI
+### Register with Antigravity CLI (agy)
 
 ```bash
-gemini mcp add monarch -- monarch-mcp stdio --user local
+agy mcp add monarch -- monarch-mcp stdio --user local
 ```
+
+See [docs/ANTIGRAVITY-CLI.md](docs/ANTIGRAVITY-CLI.md) for agy details.
 
 ### Available Tools
 
@@ -498,7 +500,7 @@ works; an authentication error in the body means the session needs rotating.
 monarch-admin tokens create user@example.com
 ```
 
-Copy the returned token and register the remote server with your MCP client. Both Claude Code and Gemini CLI expand `${VAR}` in MCP config, so keep the token in an env var rather than pasting it into config files:
+Copy the returned token and register the remote server with your MCP client (or run `monarch-admin register --user <email>`, which prints these commands with the token filled in). Claude Code expands `${VAR}` in MCP config, so keep the token in an env var rather than pasting it into config files:
 
 ```bash
 export MONARCH_JWT="<token from tokens create>"
@@ -507,9 +509,9 @@ export MONARCH_JWT="<token from tokens create>"
 claude mcp add --scope user --transport http monarch https://your-service-url/ \
   --header "Authorization: Bearer \${MONARCH_JWT}"
 
-# Gemini CLI
-gemini mcp add --transport http monarch https://your-service-url/ \
-  --header "Authorization: Bearer \${MONARCH_JWT}"
+# Antigravity CLI (agy): flags go before the name; the token is written into
+# agy's config (~/.gemini/config/mcp_config.json)
+agy mcp add --header "Authorization: Bearer $MONARCH_JWT" monarch https://your-service-url/
 ```
 
 ## Development
