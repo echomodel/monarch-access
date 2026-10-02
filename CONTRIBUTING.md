@@ -73,6 +73,39 @@ make test              # Unit tests only (default)
 make integration-test  # Live API tests (requires a Monarch session)
 ```
 
+## Releases
+
+The version comes from git tags; there is no version number to edit by hand.
+`setuptools-scm` derives it at build time: a commit tagged `vX.Y.Z` builds as
+`X.Y.Z`, any later commit as a dev version such as `X.Y.(Z+1).devN+g<sha>`.
+Builds from a `git archive` snapshot (the cloud deploy) read the same
+information from `.git_archival.txt`, which git fills in on export
+(`.gitattributes`: `export-subst`).
+
+| Change | Bump |
+|--------|------|
+| Bug fix, internal cleanup | patch |
+| New command, tool, option, or other feature | minor |
+| Breaking change (on 0.x) | minor; a new major only with the maintainer's explicit approval |
+
+Docs-only changes need no release.
+
+To release:
+
+```bash
+make test                                   # unit + framework tests pass
+git tag -a vX.Y.Z -m "vX.Y.Z" <sha>          # annotate the reviewed commit
+git push origin <sha>:main && git push origin vX.Y.Z
+```
+
+Deploy the tag, not a branch, so the running service is exactly that release
+(the deploy reports `X.Y.Z`; a branch deploy reports a dev version). Verify the
+deployment afterwards: `monarch-admin probe` and
+`monarch-admin tools call count_accounts`.
+
+Dependency pins follow the same rule: `mcp-app` is pinned to a release tag
+(`@vX.Y.Z`) in `pyproject.toml`, never a branch.
+
 ## Architecture
 
 This project follows a CLI/MCP/SDK layered architecture:

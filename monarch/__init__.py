@@ -6,7 +6,13 @@ from . import net_worth
 from . import transactions
 
 __all__ = ["MonarchClient", "accounts", "net_worth", "transactions", "app"]
-__version__ = "0.9.0"
+from importlib.metadata import PackageNotFoundError, version as _dist_version
+
+try:
+    # Derived from the git tag at build time (setuptools-scm); see CONTRIBUTING "Releases".
+    __version__ = _dist_version("monarch-access")
+except PackageNotFoundError:
+    __version__ = "0.0.0+unknown"
 
 # --- mcp-app integration ---
 

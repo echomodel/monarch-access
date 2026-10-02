@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "monarch-access"
-version = "0.9.0"
+dynamic = ["version"]
 description = "Lightweight CLI and Python SDK for accessing Monarch Money financial data"
 readme = "README.md"
 license = "MIT"
@@ -39,6 +39,12 @@ monarch = "monarch:app"
 [project.urls]
 Homepage = "https://github.com/echomodel/monarch-access"
 Repository = "https://github.com/echomodel/monarch-access"
+
+[tool.setuptools_scm]
+# The version comes from the latest vX.Y.Z git tag. Builds from a `git archive`
+# snapshot (the cloud deploy) read it from .git_archival.txt; the fallback only
+# applies when neither git metadata nor the archival file is available.
+fallback_version = "0.0.0+unknown"
 
 [tool.setuptools.packages.find]
 include = ["monarch*"]
