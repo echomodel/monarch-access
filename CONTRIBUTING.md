@@ -170,11 +170,13 @@ The Monarch UI displays payment amounts and due dates for these streams, but the
 
 ### Merchant-Level Recurring
 
-Recurring streams are controlled through the **merchant** resource:
-- Each merchant has a recurring flag (on/off), amount, and frequency
-- Toggling recurring on a merchant creates streams; toggling off removes ALL streams for that merchant
-- One merchant can have multiple streams (different detection patterns from varying payee names)
-- The `markStreamAsNotRecurring(streamId)` mutation removes a stream but affects all streams for its merchant
+Recurring settings are controlled through the **merchant** resource. Verified against a live account and the web app (its only edit screen is "Edit merchant": recurring on/off, frequency, type, start date, amount, status Active/Canceled):
+
+- **A merchant can have several streams.** Detection creates separate streams when payee text varies, and many are duplicates (same amount and frequency). `recurringTransactionStreams` lists every stream with its `merchant.id`.
+- **Edits are merchant-scoped, and with several streams their target is unpredictable.** `updateMerchant(recurrence: …)` is the only edit; there is no per-stream edit mutation. For a merchant with two streams, `merchant(id).recurringTransactionStream` (and the web app's Edit merchant dialog) reported one stream, but the edit changed the other one, while the mutation response still reported the first, unchanged. The stream that `merchant(id:)` reports can also differ from the same field read nested inside `recurringTransactionStreams`, and it can change after a stream is removed. The web app's list can display yet another stream's amount for the merchant.
+- **So `update_recurring`** makes amount/frequency/active changes only when the stream is its merchant's only stream and `merchant(id:)` reports it; otherwise it raises `StreamNotEditableError` without sending anything. After the edit it re-reads the stream from `recurringTransactionStreams` and checks the new values, because the mutation response is not proof of which stream changed.
+- **Removal is stream-scoped.** `markStreamAsNotRecurring(streamId)` removes only that stream; the merchant's other streams remain. The web app's "Mark merchant as not recurring" sends it with the merchant's exposed stream. It is irreversible: no known call restores a removed stream (turning recurring back on for the merchant creates tracking again).
+- **Duplicates and stale streams:** remove them per stream (`update_recurring(status="removed")` / `mark_as_not_recurring`). Only when one merchant carries genuinely separate obligations that need separate settings is splitting merchants worth it (see Multi-Account Merchant Splitting).
 
 ### Merchant Data Staleness
 
@@ -212,7 +214,7 @@ This query is captured in `queries.py` as `AGGREGATED_RECURRING_ITEMS_QUERY` but
 Schema introspection is disabled. All mutations were reverse-engineered from the Monarch web app via Chrome DevTools.
 
 **Recurring stream removal:**
-- `markStreamAsNotRecurring(streamId: ID!)` — permanently removes stream. Affects all streams for the merchant. Request only `success` — requesting `errors` sub-fields causes HTTP 400. Implemented in SDK/MCP/CLI.
+- `markStreamAsNotRecurring(streamId: ID!)` — permanently removes that one stream; the merchant's other streams remain (verified live). The web app requests `success` plus `errors { ...PayloadErrorFields }` (a fragment over `PayloadError`); this repo requests only `success`. Implemented in SDK/MCP/CLI.
 
 **Merchant update:**
 - `updateMerchant(input: UpdateMerchantInput!)` — update merchant name and recurring settings. Input shape:
@@ -257,7 +259,7 @@ Transactions are filtered by tag via the existing `transactions` query's `filter
 
 ### Multi-Account Merchant Splitting
 
-When one merchant (e.g., an insurer) handles multiple policies from different accounts, transactions can be reassigned to new merchants:
+When one merchant (e.g., an insurer) handles multiple genuinely separate obligations — such as policies paid from different accounts — that need their own recurring settings, transactions can be reassigned to new merchants. (Not needed for duplicate or stale streams: remove those per stream; see Merchant-Level Recurring.)
 
 1. Use `update_transaction(id, merchant_name="New Name")` — Monarch auto-creates the merchant if it doesn't exist
 2. Set up recurring on the new merchant via `updateMerchant`

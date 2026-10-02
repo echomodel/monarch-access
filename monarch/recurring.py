@@ -13,50 +13,43 @@ from .queries import (
 )
 
 
-async def _find_merchant_for_stream(client, stream_id: str) -> dict:
-    """Look up the merchant and its current recurring state for a given stream_id.
+class StreamNotEditableError(Exception):
+    """The requested stream cannot be changed safely (see update_recurring)."""
 
-    Uses Common_GetRecurringStreams (which includes inactive streams) to find
-    the merchant, then queries the merchant for its current recurrence settings.
+
+STREAM_LIST_QUERY = """query {
+    recurringTransactionStreams(includePending: true, includeLiabilities: true) {
+        stream { id amount frequency baseDate merchant { id name } }
+    }
+}"""
+
+MERCHANT_RECURRENCE_QUERY = """query($id: ID!) {
+    merchant(id: $id) {
+        id name
+        recurringTransactionStream { id frequency amount baseDate isActive }
+    }
+}"""
+
+
+async def _streams(client) -> list[dict]:
+    data = await client._request(STREAM_LIST_QUERY, {})
+    return [r.get("stream") or {} for r in data.get("recurringTransactionStreams", [])]
+
+
+async def _stream_and_merchant(client, stream_id: str) -> tuple[dict, list[dict]]:
+    """Return ``(stream, all streams of its merchant)`` for ``stream_id``.
+
+    Raises when the stream is unknown or has no merchant (credit-report liability).
     """
-    # Use the full stream list which includes inactive streams
-    q = """query {
-        recurringTransactionStreams(includePending: true, includeLiabilities: true) {
-            stream {
-                id
-                merchant { id name }
-            }
-        }
-    }"""
-    data = await client._request(q, {})
-    all_streams = data.get("recurringTransactionStreams", [])
-
-    merchant_id = None
-    merchant_name = None
-    for item in all_streams:
-        stream = item.get("stream", {})
-        if stream.get("id") == stream_id:
-            merchant = stream.get("merchant") or {}
-            merchant_id = merchant.get("id")
-            merchant_name = merchant.get("name")
-            break
-
+    rows = await _streams(client)
+    stream = next((s for s in rows if s.get("id") == stream_id), None)
+    merchant_id = ((stream or {}).get("merchant") or {}).get("id")
     if not merchant_id:
-        raise Exception(f"Stream {stream_id} not found or has no merchant (may be a credit report liability)")
-
-    # Get current merchant state
-    q2 = """query($search: String) {
-        merchants(search: $search) {
-            id name
-            recurringTransactionStream { id frequency amount baseDate isActive }
-        }
-    }"""
-    data2 = await client._request(q2, {"search": merchant_name})
-    for m in data2.get("merchants", []):
-        if m["id"] == merchant_id:
-            return m
-
-    raise Exception(f"Merchant {merchant_id} ({merchant_name}) not found")
+        raise ValueError(
+            f"Stream {stream_id} not found or has no merchant (may be a credit report liability)"
+        )
+    siblings = [s for s in rows if (s.get("merchant") or {}).get("id") == merchant_id]
+    return stream, siblings
 
 
 async def update_recurring(
@@ -67,26 +60,60 @@ async def update_recurring(
     amount: float | None = None,
     frequency: str | None = None,
 ) -> dict:
-    """Update a recurring stream's settings via its merchant.
+    """Update a recurring stream's status, amount, or frequency.
+
+    Monarch's model (verified against a live account and the web app): a
+    merchant can have several detected recurring streams, but recurrence
+    settings — amount, frequency, active/canceled — are edited only through
+    the merchant (`updateMerchant`); there is no per-stream edit. When a
+    merchant has several streams, which one an edit lands on is not
+    predictable from the API: it can differ from the stream the merchant
+    reports (``merchant(id).recurringTransactionStream``) and from the stream
+    in the mutation's response. Removing a stream (`markStreamAsNotRecurring`)
+    is per-stream.
+
+    So:
+    - ``status="removed"`` removes exactly ``stream_id`` (irreversible).
+    - Other changes are made only when ``stream_id`` is its merchant's only
+      stream; otherwise ``StreamNotEditableError`` is raised and nothing is
+      sent. Remove the duplicates first, then edit the remaining stream.
+    - After an edit, the stream is re-read and the requested values are
+      checked; a mismatch raises instead of reporting success.
 
     Args:
         stream_id: The stream_id from list_recurring.
         status: 'active', 'inactive', or 'removed'.
-            - active: reactivate a deactivated stream
-            - inactive: deactivate (reversible, keeps in system)
-            - removed: permanently remove all streams for this merchant
         amount: New recurring amount (negative for expenses).
         frequency: New frequency (monthly, biweekly, weekly, etc.).
 
-    Returns the updated merchant data, or removal result.
+    Returns the updated merchant (with ``recurringTransactionStream``), or the
+    removal result.
     """
     if status == "removed":
         return await mark_as_not_recurring(client, stream_id)
 
-    merchant = await _find_merchant_for_stream(client, stream_id)
-    rts = merchant.get("recurringTransactionStream") or {}
+    stream, siblings = await _stream_and_merchant(client, stream_id)
+    merchant_ref = stream["merchant"]
+    if len(siblings) > 1:
+        others = ", ".join(s["id"] for s in siblings if s["id"] != stream_id)
+        raise StreamNotEditableError(
+            f"Merchant '{merchant_ref.get('name')}' has {len(siblings)} recurring streams "
+            f"({stream_id}, {others}). Monarch edits recurrence per merchant, and with several "
+            f"streams the edit can land on a different stream than the one requested, so it "
+            f"is not attempted. Remove the duplicate or stale streams with status='removed' "
+            f"(irreversible) until one remains, then update it."
+        )
 
-    # Build recurrence object — must send all fields
+    data = await client._request(MERCHANT_RECURRENCE_QUERY, {"id": merchant_ref["id"]})
+    merchant = data.get("merchant") or {}
+    rts = merchant.get("recurringTransactionStream") or {}
+    if rts.get("id") != stream_id:
+        raise StreamNotEditableError(
+            f"Merchant '{merchant.get('name')}' reports stream {rts.get('id')} for edits, not "
+            f"{stream_id}; the update is not attempted."
+        )
+
+    # Build recurrence object — Monarch requires all fields every time.
     recurrence = {
         "isRecurring": True,
         "frequency": frequency if frequency is not None else rts.get("frequency", "monthly"),
@@ -94,30 +121,38 @@ async def update_recurring(
         "amount": amount if amount is not None else rts.get("amount", 0),
         "isActive": rts.get("isActive", True),
     }
-
     if status == "active":
         recurrence["isActive"] = True
     elif status == "inactive":
         recurrence["isActive"] = False
 
-    variables = {
-        "input": {
-            "merchantId": merchant["id"],
-            "name": merchant["name"],
-            "recurrence": recurrence,
-        }
-    }
-
+    variables = {"input": {"merchantId": merchant["id"], "name": merchant["name"], "recurrence": recurrence}}
     data = await client._request(UPDATE_MERCHANT_MUTATION, variables)
     result = data.get("updateMerchant", {})
-    return result.get("merchant", result)
+    updated = result.get("merchant", result)
+
+    # The mutation response is not proof of which stream changed; re-read it.
+    after = next((s for s in await _streams(client) if s.get("id") == stream_id), None)
+    mismatched = [
+        f for f in ("amount", "frequency")
+        if after is None or after.get(f) != recurrence[f]
+    ]
+    if mismatched:
+        raise StreamNotEditableError(
+            f"Monarch accepted the update but stream {stream_id} does not show the new "
+            f"{', '.join(mismatched)}. Check it with list_recurring."
+        )
+    return updated
 
 
 async def mark_as_not_recurring(client, stream_id: str) -> dict:
-    """Mark a recurring stream as not recurring.
+    """Remove one recurring stream (`markStreamAsNotRecurring`).
 
-    Removes the stream from Monarch's recurring list.
-    Returns the mutation result.
+    Per-stream: only ``stream_id`` is removed; the merchant's other streams
+    stay (verified live). This is what the web app's "Mark merchant as not
+    recurring" sends, with the stream the merchant exposes. Irreversible:
+    no known API call restores a removed stream; re-enabling recurring on the
+    merchant (Edit merchant) creates tracking again.
     """
     variables = {"streamId": stream_id}
     data = await client._request(MARK_AS_NOT_RECURRING_MUTATION, variables)

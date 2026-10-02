@@ -551,14 +551,20 @@ async def update_recurring(
 ) -> dict[str, Any]:
     """Update a recurring stream's status, amount, or frequency.
 
-    Takes a stream_id from list_recurring and updates the underlying
-    merchant's recurring settings. Only works on merchant-based streams
-    (not credit report liabilities).
+    Takes a stream_id from list_recurring. Monarch edits recurrence settings
+    per merchant, and when a merchant has several recurring streams (often
+    duplicates) an edit can land on a different stream than the one asked
+    for. So amount/frequency/active changes are made only when the stream is
+    its merchant's only stream; otherwise an error lists the merchant's
+    streams and nothing is changed — remove the duplicates with
+    status='removed' first. Only works on merchant-based streams (not credit
+    report liabilities).
 
     Status values:
-    - active: reactivate a previously deactivated stream (reversible)
-    - inactive: deactivate the stream (reversible)
-    - removed: permanently remove ALL streams for this merchant (irreversible)
+    - active: reactivate the merchant's recurrence (reversible)
+    - inactive: cancel the merchant's recurrence (reversible)
+    - removed: remove exactly this one stream (irreversible); the merchant's
+      other streams stay. Use this to drop duplicate or stale streams.
 
     Args:
         stream_id: The stream_id from list_recurring.
@@ -578,9 +584,9 @@ async def update_recurring(
 async def mark_as_not_recurring(
     stream_id: str,
 ) -> dict[str, Any]:
-    """Permanently remove a recurring stream. DEPRECATED — use update_recurring with status='removed' instead.
+    """Permanently remove one recurring stream. Same as update_recurring with status='removed'.
 
-    This is a nuclear option that removes ALL streams for the merchant.
+    Removes only this stream; the merchant's other streams stay. Irreversible.
     Prefer update_recurring(status='inactive') for reversible deactivation.
 
     Args:

@@ -431,7 +431,7 @@ gemini mcp add monarch -- monarch-mcp stdio --user local
 | `create_transactions` | Create one or more manual transactions (partial success reported) |
 | `delete_transactions` | Delete one or more transactions (partial success reported) |
 | `list_recurring` | List recurring obligations |
-| `update_recurring` | Update recurring stream settings |
+| `update_recurring` | Update recurring stream settings (edits only a merchant's sole stream; `removed` drops one stream) |
 | `list_tags` | List all transaction tags (id, name, color) |
 | `add_transaction_tag` | Add a tag to a transaction (created if missing); preserves existing tags |
 | `remove_transaction_tag` | Remove a tag from a transaction, preserving its other tags |

@@ -525,7 +525,7 @@ def recurring_list(output_format: str):
 
 @recurring_group.command("update")
 @click.argument("stream_id")
-@click.option("--status", type=click.Choice(["active", "inactive", "removed"]), help="active, inactive (reversible), or removed (permanent)")
+@click.option("--status", type=click.Choice(["active", "inactive", "removed"]), help="active, inactive (reversible), or removed (this stream only, permanent)")
 @click.option("--amount", type=float, help="New recurring amount (negative for expenses)")
 @click.option("--frequency", help="New frequency: monthly, biweekly, weekly, etc.")
 def recurring_update(stream_id: str, status: str, amount: float, frequency: str):
@@ -535,11 +535,16 @@ def recurring_update(stream_id: str, status: str, amount: float, frequency: str)
 
     Status values:
 
-      active    — reactivate a deactivated stream
+      active    — reactivate the merchant's recurrence
 
-      inactive  — deactivate (reversible, keeps in system)
+      inactive  — cancel the merchant's recurrence (reversible)
 
-      removed   — permanently remove ALL streams for this merchant
+      removed   — permanently remove this one stream (other streams stay)
+
+    Monarch edits recurrence per merchant; when a merchant has several
+    streams an edit can land on a different stream, so amount, frequency
+    and active/inactive changes are refused unless the stream is the
+    merchant's only one. Drop duplicates with --status removed first.
     """
     if not any([status, amount, frequency]):
         click.echo("Provide at least one of --status, --amount, or --frequency", err=True)
@@ -568,7 +573,7 @@ def recurring_update(stream_id: str, status: str, amount: float, frequency: str)
 @recurring_group.command("remove")
 @click.argument("stream_id")
 def recurring_remove(stream_id: str):
-    """Permanently remove a recurring stream. Alias for 'update --status=removed'."""
+    """Permanently remove one recurring stream (other streams of the merchant stay). Alias for 'update --status=removed'."""
     try:
         provider = get_provider()
         result = provider.mark_as_not_recurring(stream_id)

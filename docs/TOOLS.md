@@ -222,7 +222,9 @@ Update a recurring stream's status, amount, or frequency.
 
 **Input:**
 - `stream_id` (string, required)
-- `status` (string, optional): `active`, `inactive` (reversible), or `removed` (permanent)
+- `status` (string, optional): `active`, `inactive` (reversible), or `removed` (this stream only, permanent)
+
+Monarch edits recurrence settings per merchant, and when a merchant has several streams an edit can land on a different stream than the one requested. So amount, frequency and active/inactive changes are made only when the stream is its merchant's only stream; otherwise the tool returns an error listing the merchant's streams and changes nothing. Remove duplicates with `status='removed'` (works on any single stream), then edit the remaining one.
 - `amount` (float, optional): New amount
 - `frequency` (string, optional): `monthly`, `biweekly`, `weekly`, etc.
 
@@ -230,9 +232,9 @@ Update a recurring stream's status, amount, or frequency.
 
 ### `mark_as_not_recurring`
 
-**Deprecated** — use `update_recurring` with `status='removed'` instead.
+Same as `update_recurring` with `status='removed'`.
 
-Permanently remove a recurring stream. Removes ALL streams for the merchant.
+Permanently remove one recurring stream. The merchant's other streams remain. Use it to drop duplicate or stale streams.
 
 **Input:**
 - `stream_id` (string, required)

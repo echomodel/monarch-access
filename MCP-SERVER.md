@@ -64,8 +64,8 @@ gemini mcp list
 | `create_transactions` | Create one or more manual transactions (partial success reported) |
 | `delete_transactions` | Delete one or more transactions (partial success reported) |
 | `list_recurring` | List tracked recurring obligations (bills, subscriptions, loans) |
-| `update_recurring` | Update a recurring stream's status, amount, or frequency |
-| `mark_as_not_recurring` | Permanently remove a recurring stream (deprecated — use `update_recurring`) |
+| `update_recurring` | Update a recurring stream's status, amount, or frequency (edits only a merchant's sole stream; `removed` drops one stream) |
+| `mark_as_not_recurring` | Permanently remove one recurring stream (the merchant's other streams stay) |
 | `list_tags` | List all transaction tags (id, name, color) |
 | `add_transaction_tag` | Add a tag to a transaction (created if missing); preserves existing tags |
 | `remove_transaction_tag` | Remove a tag from a transaction, preserving its other tags |
