@@ -212,7 +212,13 @@ async def create_rule(
 
 
 async def delete_rule(client, rule_id: str) -> dict:
-    """Delete a transaction rule by ID."""
+    """Delete a transaction rule by ID.
+
+    The `deleteTransactionRule` mutation returns ``deleted: false`` even when
+    the delete succeeds (observed live), so its flag is not used. Errors in
+    the response raise ``APIError``; otherwise success is decided by
+    re-reading the rules list and checking the rule is gone.
+    """
     data = await client._request(
         DELETE_TRANSACTION_RULE_MUTATION, {"id": rule_id}
     )
@@ -222,5 +228,5 @@ async def delete_rule(client, rule_id: str) -> dict:
         msg = errors.get("message") or str(errors.get("fieldErrors", []))
         from .client import APIError
         raise APIError(f"Delete rule failed: {msg}")
-    deleted = result.get("deleted", False)
+    deleted = not any(r.get("id") == rule_id for r in await get_rules(client))
     return {"success": deleted, "deleted": deleted}

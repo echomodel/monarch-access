@@ -248,6 +248,9 @@ The `cloudinaryPublicId` from an existing merchant can be reused on other mercha
 
 Both captured in `queries.py` but not yet wired to SDK/MCP/CLI.
 
+**Transaction rules:**
+- `deleteTransactionRule(id)` returns `deleted: false` (with `errors: null`) even when the rule was deleted. `delete_rule` therefore ignores the flag and confirms by re-reading `transactionRules`.
+
 **Transaction tags:**
 - `householdTransactionTags` query — lists all tags for the household (id, name, color, order). Used to resolve a tag name to its ID before filtering or setting.
 - `createTransactionTag(input: {name, color})` mutation — creates a tag. **A color is required**; the SDK supplies a neutral default (`#aaaaaa`) when the caller omits one. Returns the created tag's id/name/color.

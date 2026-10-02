@@ -716,7 +716,9 @@ async def delete_rule(
 ) -> dict[str, Any]:
     """Delete a transaction rule by ID.
 
-    Get rule IDs from list_rules. This cannot be undone.
+    Get rule IDs from list_rules. This cannot be undone. The result's
+    success/deleted reflect whether the rule is gone from the rules list
+    afterwards (verified by re-reading it).
 
     Args:
         rule_id: The ID of the rule to delete.
