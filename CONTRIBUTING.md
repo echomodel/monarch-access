@@ -261,12 +261,16 @@ Transactions are filtered by tag via the existing `transactions` query's `filter
 
 When one merchant (e.g., an insurer) handles multiple genuinely separate obligations — such as policies paid from different accounts — that need their own recurring settings, transactions can be reassigned to new merchants. (Not needed for duplicate or stale streams: remove those per stream; see Merchant-Level Recurring.)
 
-1. Use `update_transaction(id, merchant_name="New Name")` — Monarch auto-creates the merchant if it doesn't exist
-2. Set up recurring on the new merchant via `updateMerchant`
-3. Copy logo via `setMerchantLogo` with the original's `cloudinaryPublicId`
-4. Deactivate the original merchant's recurring
+1. Create a transaction rule (`create_rule`) with `set_merchant_action` = the new merchant name, matching on criteria that stay true for every future payment of that obligation: payee (`merchant_criteria` / `original_statement_criteria`) plus paying account (`account_ids`), and amount only if fixed. Use `apply_to_existing=True` to move past payments. Renaming single transactions with `update_transaction` is not enough: future transactions arrive under the original merchant.
+2. Set up recurring on the new merchant via `updateMerchant` (`update_recurring` once it is the merchant's only stream).
+3. Copy logo via `setMerchantLogo` with the original's `cloudinaryPublicId` (captured, not yet implemented).
+4. Deactivate or remove the original merchant's corresponding stream.
 
-This workflow is proven and uses existing implemented tools for steps 1-2, plus captured-but-not-yet-implemented mutations for steps 3-4.
+**Do not use a category criterion** in a split rule when the rule itself, or Monarch's learned categorization, changes the category. Observed live: a split rule matching merchant + account + category "Insurance" also set category "Auto Insurance"; after some months Monarch categorized new payments as "Auto Insurance" on arrival, the rule stopped matching, and payments silently returned to the original merchant (the split stream showed unpaid while the original merchant's stream counted them). A replacement rule on merchant + account only, applied to existing transactions, moved them back.
+
+**Paid status does not follow moved transactions on its own.** After the rule moved the payments, the original merchant's stream still showed them as paid and the split stream showed unpaid (unchanged after 5 minutes). Updating the split stream's amount to the current payment (`update_recurring`) made Monarch re-match within minutes: the matching occurrences flipped to paid on the split stream and left the original one. An occurrence whose payment amount differed from the stream amount stayed unpaid. Whether the rule catches each newly imported payment is expected from Monarch's rule behavior but was not observed directly at the time of writing.
+
+The agent-facing version of this guidance lives in the `create_rule`, `update_transaction`, `list_recurring` and `update_recurring` tool docstrings, which MCP clients read at runtime; keep the two in sync.
 
 ### Product Model (Monarch Recurring)
 

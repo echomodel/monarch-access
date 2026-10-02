@@ -351,7 +351,10 @@ async def update_transaction(
     Args:
         transaction_id: The ID of the transaction to update.
         category_id: New category ID to assign. Get IDs from list_categories.
-        merchant_name: New merchant name to set.
+        merchant_name: New merchant name to set (created if it does not
+            exist). Affects only this transaction; future transactions from
+            the same payee keep their original merchant unless a rule
+            reassigns them (see create_rule).
         notes: Notes to add or update. Use empty string to clear notes.
         needs_review: Set to true to mark as needing review, false to mark as reviewed.
         hide_from_reports: Set to true to hide from reports/budgets, false to include.
@@ -531,8 +534,15 @@ async def list_recurring() -> dict[str, Any]:
     """List tracked recurring obligations from Monarch Money.
 
     Returns bills, subscriptions, loan payments, and credit card payments.
-    Each item includes merchant, expected amount, frequency, category,
-    account, and whether this month's payment has been made.
+    Each item includes stream_id, merchant, merchant_id, expected amount,
+    frequency, category, account, due_date, and last_paid_date.
+
+    One merchant can have several streams (several items with the same
+    merchant_id). Monarch's detection often creates duplicates (same amount
+    and frequency) or keeps stale ones (old amount, no recent last_paid_date).
+    Before changing a stream with update_recurring, check whether its
+    merchant_id appears more than once: edits are only possible when it is
+    the merchant's only stream.
     """
     try:
         return await sdk.get_recurring()
@@ -556,9 +566,19 @@ async def update_recurring(
     duplicates) an edit can land on a different stream than the one asked
     for. So amount/frequency/active changes are made only when the stream is
     its merchant's only stream; otherwise an error lists the merchant's
-    streams and nothing is changed — remove the duplicates with
-    status='removed' first. Only works on merchant-based streams (not credit
-    report liabilities).
+    streams (amount, frequency, base date) with next steps and nothing is
+    changed. Only works on merchant-based streams (not credit report
+    liabilities).
+
+    Workflow for a merchant with several streams:
+    1. Decide with list_recurring whether the extra streams are the same
+       obligation (duplicate or stale) or genuinely separate ones (for
+       example two insurance policies billed by one company).
+    2. Duplicates/stale: confirm with the user, remove each with
+       status='removed' (irreversible), then edit the remaining stream.
+    3. Separate obligations: split them into separate merchants with a
+       transaction rule (see create_rule), so each obligation has its own
+       merchant and stream.
 
     Status values:
     - active: reactivate the merchant's recurrence (reversible)
@@ -586,8 +606,11 @@ async def mark_as_not_recurring(
 ) -> dict[str, Any]:
     """Permanently remove one recurring stream. Same as update_recurring with status='removed'.
 
-    Removes only this stream; the merchant's other streams stay. Irreversible.
-    Prefer update_recurring(status='inactive') for reversible deactivation.
+    Removes only this stream; the merchant's other streams stay. Irreversible:
+    there is no call that restores it, so confirm with the user first. Use it
+    to clear duplicate or stale streams of a merchant before editing the one
+    that remains. For a reversible change on a merchant's only stream, use
+    update_recurring(status='inactive').
 
     Args:
         stream_id: The stream_id from list_recurring to mark as not recurring.
@@ -631,7 +654,30 @@ async def create_rule(
     """Create a new transaction auto-categorization rule.
 
     Rules match transactions by criteria and apply actions. At least one
-    criterion and one action are required.
+    criterion and one action are required. Monarch applies rules to new
+    transactions as they arrive; apply_to_existing also applies the rule to
+    matching past transactions.
+
+    Splitting one merchant into several (e.g. separate insurance policies,
+    each with its own recurring stream): renaming a transaction's merchant
+    with update_transaction changes only that transaction, and future
+    transactions keep arriving under the original merchant. A rule makes the
+    split last: set_merchant_action to the new merchant name, matching on
+    criteria that stay true for every future payment of that obligation —
+    the payee (merchant_criteria or original_statement_criteria) plus the
+    paying account (account_ids), and amount_criteria only if the amount is
+    fixed. Do not use category_ids as a criterion when the rule (or
+    Monarch's learned categorization) changes the category: new
+    transactions then arrive in the new category, the rule stops matching,
+    and the split silently stops. Use apply_to_existing=True to move past
+    payments, and check the result with list_transactions.
+
+    Moving payments does not move their recurring "paid" status: the old
+    merchant's stream keeps them until the new merchant's stream is updated.
+    After the rule, set the new merchant's stream amount (and frequency) to
+    the current payment with update_recurring; Monarch then re-matches the
+    payments to it within minutes. A payment only counts as paid when its
+    amount matches the stream's amount.
 
     Args:
         set_category_action: Category ID to assign to matching transactions.

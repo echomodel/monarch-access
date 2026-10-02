@@ -95,13 +95,21 @@ async def update_recurring(
     stream, siblings = await _stream_and_merchant(client, stream_id)
     merchant_ref = stream["merchant"]
     if len(siblings) > 1:
-        others = ", ".join(s["id"] for s in siblings if s["id"] != stream_id)
+        listing = "; ".join(
+            f"{s['id']}{' (requested)' if s['id'] == stream_id else ''}: amount {s.get('amount')}, "
+            f"{s.get('frequency')}, base date {s.get('baseDate')}"
+            for s in siblings
+        )
         raise StreamNotEditableError(
             f"Merchant '{merchant_ref.get('name')}' has {len(siblings)} recurring streams "
-            f"({stream_id}, {others}). Monarch edits recurrence per merchant, and with several "
-            f"streams the edit can land on a different stream than the one requested, so it "
-            f"is not attempted. Remove the duplicate or stale streams with status='removed' "
-            f"(irreversible) until one remains, then update it."
+            f"[{listing}]. Monarch edits recurrence per merchant, and with several streams the "
+            f"edit can land on a different stream than the one requested, so nothing was "
+            f"changed. Next steps: if the extra streams are duplicates or stale (same "
+            f"obligation; compare amount, frequency and last_paid_date in list_recurring), "
+            f"confirm with the user, remove them with status='removed' (irreversible, one "
+            f"stream per call), then update the remaining stream. If they are genuinely "
+            f"separate obligations, split them into separate merchants instead (see "
+            f"create_rule)."
         )
 
     data = await client._request(MERCHANT_RECURRENCE_QUERY, {"id": merchant_ref["id"]})
