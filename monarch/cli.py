@@ -1011,6 +1011,10 @@ def _list_rules(output_format: str) -> str:
             if "add_tags" in actions:
                 tag_names = [t["name"] for t in actions["add_tags"]]
                 action_parts.append(f"→ tags: {', '.join(tag_names)}")
+            if "review_status" in actions:
+                action_parts.append(f"→ review: {actions['review_status']}")
+            if "hide_from_reports" in actions:
+                action_parts.append("→ hide from reports")
 
             criteria_str = " & ".join(parts) if parts else "(no criteria)"
             action_str = " ".join(action_parts) if action_parts else "(no action)"
@@ -1019,6 +1023,92 @@ def _list_rules(output_format: str) -> str:
             lines.append(f"  [{r['id']}] {criteria_str} {action_str} (applied: {applied}x)")
 
         return "\n".join(lines)
+
+
+@rules_group.command("create")
+@click.option("--merchant", "merchant_contains", help="Match merchant name containing this text")
+@click.option("--merchant-exact", help="Match merchant name exactly")
+@click.option("--statement", "statement_contains", help="Match original statement containing this text")
+@click.option("--account", "account_ids", multiple=True, help="Limit to this account ID (repeatable)")
+@click.option("--set-category", help="Category to assign (by name)")
+@click.option("--set-merchant", help="Merchant name to assign")
+@click.option("--add-tag", "add_tags", multiple=True, help="Tag to add, by name (repeatable; created if missing)")
+@click.option("--review-status", type=click.Choice(["reviewed", "needs_review"]), help="Review status to set")
+@click.option("--apply-to-existing", is_flag=True, help="Also apply to existing matching transactions")
+def rules_create(
+    merchant_contains: Optional[str],
+    merchant_exact: Optional[str],
+    statement_contains: Optional[str],
+    account_ids: tuple[str, ...],
+    set_category: Optional[str],
+    set_merchant: Optional[str],
+    add_tags: tuple[str, ...],
+    review_status: Optional[str],
+    apply_to_existing: bool,
+):
+    """Create a transaction rule.
+
+    Needs at least one criterion (--merchant, --merchant-exact, --statement,
+    --account) and at least one action (--set-category, --set-merchant,
+    --add-tag, --review-status). Actions combine: one rule can set the
+    category, rename the merchant, and mark the transaction reviewed.
+    """
+    import asyncio
+    from . import categories
+    from .rules import create_rule
+    from .transactions.tags import ensure_tag
+    from .providers.api.provider import _load_client
+
+    merchant_criteria = []
+    if merchant_contains:
+        merchant_criteria.append({"operator": "contains", "value": merchant_contains})
+    if merchant_exact:
+        merchant_criteria.append({"operator": "eq", "value": merchant_exact})
+    statement_criteria = (
+        [{"operator": "contains", "value": statement_contains}] if statement_contains else None
+    )
+    if not (merchant_criteria or statement_criteria or account_ids):
+        raise click.UsageError("At least one criterion is required (--merchant, --merchant-exact, --statement, --account).")
+    if not (set_category or set_merchant or add_tags or review_status):
+        raise click.UsageError("At least one action is required (--set-category, --set-merchant, --add-tag, --review-status).")
+
+    async def _create():
+        client = _load_client()
+        category_id = None
+        if set_category:
+            cats = await categories.get_categories(client)
+            matching = [c for c in cats if c["name"].lower() == set_category.lower()]
+            if not matching:
+                matching = [c for c in cats if set_category.lower() in c["name"].lower()]
+            if not matching:
+                raise click.UsageError(f"Category not found: {set_category}")
+            category_id = matching[0]["id"]
+        tag_ids = [(await ensure_tag(client, name))["id"] for name in add_tags] or None
+        return await create_rule(
+            client,
+            merchant_criteria=merchant_criteria or None,
+            original_statement_criteria=statement_criteria,
+            account_ids=list(account_ids) or None,
+            set_category_action=category_id,
+            set_merchant_action=set_merchant,
+            add_tags_action=tag_ids,
+            review_status_action=review_status,
+            apply_to_existing=apply_to_existing,
+        )
+
+    try:
+        result = asyncio.run(_create())
+        if result.get("success"):
+            click.echo("Created rule")
+        else:
+            click.echo("Failed to create rule", err=True)
+            sys.exit(1)
+    except AuthenticationError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except APIError as e:
+        click.echo(f"API error: {e}", err=True)
+        sys.exit(1)
 
 
 @rules_group.command("delete")

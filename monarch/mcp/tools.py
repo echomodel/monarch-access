@@ -625,11 +625,11 @@ async def mark_as_not_recurring(
 
 
 async def list_rules() -> dict[str, Any]:
-    """List all transaction auto-categorization rules from Monarch Money.
+    """List all transaction rules from Monarch Money.
 
     Returns rules with their criteria (merchant match, amount, account, category)
-    and actions (set category, set merchant, add tags, etc.).
-    Rules are applied in order to new transactions.
+    and actions (set_category, set_merchant, add_tags, review_status,
+    hide_from_reports, etc.). Rules are applied in order to new transactions.
     """
     try:
         return await sdk.get_rules()
@@ -649,14 +649,21 @@ async def create_rule(
     account_ids: Optional[list[str]] = None,
     category_ids: Optional[list[str]] = None,
     add_tags_action: Optional[list[str]] = None,
+    review_status_action: Optional[str] = None,
     apply_to_existing: bool = False,
 ) -> dict[str, Any]:
-    """Create a new transaction auto-categorization rule.
+    """Create a new transaction rule.
 
     Rules match transactions by criteria and apply actions. At least one
-    criterion and one action are required. Monarch applies rules to new
-    transactions as they arrive; apply_to_existing also applies the rule to
-    matching past transactions.
+    criterion and one action are required. Actions can be combined: one
+    rule can set the category, rename the merchant, add tags, and set the
+    review status. Monarch applies rules to new transactions as they
+    arrive; apply_to_existing also applies the rule to matching past
+    transactions.
+
+    To have matching transactions skip the review queue, set
+    review_status_action="reviewed"; to flag them for a human,
+    "needs_review". Without this action a rule leaves review status alone.
 
     Splitting one merchant into several (e.g. separate insurance policies,
     each with its own recurring stream): renaming a transaction's merchant
@@ -690,6 +697,7 @@ async def create_rule(
         account_ids: Limit rule to specific account IDs.
         category_ids: Limit rule to specific source category IDs (match transactions already in these categories).
         add_tags_action: List of tag IDs to add to matching transactions.
+        review_status_action: Review status to set on matching transactions: "reviewed" (mark reviewed) or "needs_review" (flag for review). Omit to leave review status unchanged.
         apply_to_existing: If true, retroactively apply to existing matching transactions.
     """
     try:
@@ -702,8 +710,11 @@ async def create_rule(
             set_merchant_action=set_merchant_action,
             set_category_action=set_category_action,
             add_tags_action=add_tags_action,
+            review_status_action=review_status_action,
             apply_to_existing=apply_to_existing,
         )
+    except ValueError as e:
+        return {"error": str(e), "success": False}
     except (AuthenticationError, APIError) as e:
         return {"error": str(e), "success": False}
     except Exception as e:

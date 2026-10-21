@@ -513,6 +513,7 @@ class LocalProvider:
         set_merchant_action: Optional[str] = None,
         set_category_action: Optional[str] = None,
         add_tags_action: Optional[list[str]] = None,
+        review_status_action: Optional[str] = None,
         apply_to_existing: bool = False,
     ) -> dict:
         """Create a new transaction auto-categorization rule.
@@ -523,6 +524,10 @@ class LocalProvider:
         run the rule against transactions in the local store.
         """
         import uuid
+
+        from ...rules import validate_review_status
+
+        review_status_action = validate_review_status(review_status_action)
 
         Cat = Query()
         Acct = Query()
@@ -559,11 +564,15 @@ class LocalProvider:
             "accountIds": account_ids,
             "categories": [],
             "accounts": accounts_resolved,
-            "setMerchantAction": set_merchant_action,
+            "setMerchantAction": (
+                {"id": f"merch_{uuid.uuid4().hex[:8]}", "name": set_merchant_action}
+                if set_merchant_action
+                else None
+            ),
             "setCategoryAction": set_cat,
             "addTagsAction": add_tags_action,
             "linkGoalAction": None,
-            "reviewStatusAction": None,
+            "reviewStatusAction": review_status_action,
             "setHideFromReportsAction": False,
             "sendNotificationAction": False,
             "splitTransactionsAction": None,

@@ -21,7 +21,7 @@ TEST_DATA_FILE = FIXTURES_DIR / "test_data.json"
 def _ensure_test_data_exists():
     """Generate test data from seed if it doesn't exist."""
     if not TEST_DATA_FILE.exists():
-        from generate_test_data import generate_test_data
+        from .generate_test_data import generate_test_data
         generate_test_data(TEST_DATA_FILE)
 
 

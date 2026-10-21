@@ -316,6 +316,27 @@ interlock**:
   reversible) and that nothing changed underneath. On success, the replaced
   history is returned under `previous_snapshots` for rollback.
 
+### Transaction Rules
+
+```bash
+# List rules (criteria, actions, how often each applied)
+monarch rules
+monarch rules --format json
+
+# Create a rule. Actions combine: one rule can set the category, rename the
+# merchant, add tags, and set the review status.
+monarch rules create --merchant "shell" --set-category "Gas" --review-status reviewed
+monarch rules create --statement "AUTOPAY" --account <account_id> \
+  --set-merchant "Credit Card AutoPay" --review-status reviewed --apply-to-existing
+
+# Delete a rule
+monarch rules delete <rule_id>
+```
+
+`--review-status reviewed` makes matching transactions skip the review queue;
+`needs_review` flags them for a human. Without it a rule leaves review status
+alone.
+
 ### Net Worth Report
 
 ```bash
@@ -437,6 +458,9 @@ See [docs/ANTIGRAVITY-CLI.md](docs/ANTIGRAVITY-CLI.md) for agy details.
 | `list_tags` | List all transaction tags (id, name, color) |
 | `add_transaction_tag` | Add a tag to a transaction (created if missing); preserves existing tags |
 | `remove_transaction_tag` | Remove a tag from a transaction, preserving its other tags |
+| `list_rules` | List transaction rules with their criteria and actions |
+| `create_rule` | Create a rule; actions combine (set category, set merchant, add tags, set review status) |
+| `delete_rule` | Delete a rule (confirmed by re-reading the rules list) |
 
 `list_transactions` accepts a `tags` filter (list of tag names) alongside account, category, date, and expense/income filters — so a request like *"show me every agent-reviewed transaction in a given account"* is a single call combining `tags=["agent-reviewed"]` with an account filter. Tag add/remove are non-destructive: adding a tag never drops the transaction's existing tags, and adding the same tag twice is a no-op.
 

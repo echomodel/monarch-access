@@ -8,6 +8,23 @@ from .queries import (
     DELETE_TRANSACTION_RULE_MUTATION,
 )
 
+# Values Monarch accepts for a rule's reviewStatusAction. They mirror a
+# transaction's reviewStatus ("reviewed" is the web app's "Mark as reviewed";
+# "needs_review" flags the transaction for review).
+REVIEW_STATUS_VALUES = ("reviewed", "needs_review")
+
+
+def validate_review_status(value: Optional[str]) -> Optional[str]:
+    """Return ``value`` if it is an accepted review status (or None)."""
+    if value is None:
+        return None
+    if value not in REVIEW_STATUS_VALUES:
+        raise ValueError(
+            f"review_status_action must be one of {list(REVIEW_STATUS_VALUES)}, "
+            f"got {value!r}"
+        )
+    return value
+
 
 async def get_rules(client) -> list[dict]:
     """Get all transaction rules."""
@@ -160,10 +177,12 @@ async def create_rule(
         set_merchant_action: Merchant name to set (string, not ID).
         set_category_action: Category ID to set.
         add_tags_action: List of tag IDs to add.
-        review_status_action: Review status to set.
+        review_status_action: Review status to set on matching transactions:
+            "reviewed" or "needs_review". Validated before any request.
         set_hide_from_reports: Hide matching transactions from reports.
         apply_to_existing: Apply rule to existing transactions.
     """
+    review_status_action = validate_review_status(review_status_action)
     input_data: dict[str, Any] = {
         "merchantCriteria": merchant_criteria,
         "originalStatementCriteria": original_statement_criteria,

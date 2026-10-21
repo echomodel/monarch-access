@@ -71,6 +71,9 @@ agy mcp list
 | `list_tags` | List all transaction tags (id, name, color) |
 | `add_transaction_tag` | Add a tag to a transaction (created if missing); preserves existing tags |
 | `remove_transaction_tag` | Remove a tag from a transaction, preserving its other tags |
+| `list_rules` | List transaction rules with their criteria and actions |
+| `create_rule` | Create a rule; actions combine (set category, set merchant, add tags, set review status `reviewed`/`needs_review`) |
+| `delete_rule` | Delete a rule (confirmed by re-reading the rules list) |
 
 ## Configuration
 

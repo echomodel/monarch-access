@@ -249,6 +249,8 @@ The `cloudinaryPublicId` from an existing merchant can be reused on other mercha
 Both captured in `queries.py` but not yet wired to SDK/MCP/CLI.
 
 **Transaction rules:**
+- `createTransactionRuleV2(input)` takes every action in one input, so a rule can set the category, merchant, tags, and review status together. `setMerchantAction` is a merchant **name** (Monarch resolves or creates the merchant); `setCategoryAction` and `addTagsAction` are IDs.
+- `reviewStatusAction` accepts `"reviewed"` (the web app's "Mark as reviewed") or `"needs_review"`; the values mirror a transaction's `reviewStatus`. Sourced from community reverse-engineering ([jribnik/monarch-mcp](https://github.com/jribnik/monarch-mcp), [robcerda/monarch-mcp-server](https://github.com/robcerda/monarch-mcp-server)), not yet re-verified live from this repo. Monarch adds a derived `unassignNeedsReviewByUserAction: true` to a rule whose status is `needs_review`; it is not sent on create. `create_rule` validates the value before sending anything.
 - `deleteTransactionRule(id)` returns `deleted: false` (with `errors: null`) even when the rule was deleted. `delete_rule` therefore ignores the flag and confirms by re-reading `transactionRules`.
 
 **Transaction tags:**
